@@ -1,0 +1,150 @@
+{
+  "name": "recall",
+  "displayName": "Recall",
+  "description": "Your team's terminal history as shared, searchable knowledge.",
+  "version": "0.1.0",
+  "publisher": "recall-team",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "recall.signIn",
+        "title": "Sign in",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.search",
+        "title": "Search…",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.showLastFix",
+        "title": "Show last fix",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.signOut",
+        "title": "Sign out",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.toggleCapture",
+        "title": "Toggle capture",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.menu",
+        "title": "Show menu",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.showLog",
+        "title": "Show log",
+        "category": "Recall"
+      },
+      {
+        "command": "recall.flush",
+        "title": "Send queued events now",
+        "category": "Recall"
+      }
+    ],
+    "configuration": {
+      "title": "Recall",
+      "properties": {
+        "recall.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "Base URL of the Recall backend."
+        },
+        "recall.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Capture terminal commands and share them with your team."
+        },
+        "recall.captureOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send the last 8 KB of output of failed commands (masked) so teammates can match errors."
+        },
+        "recall.ignorePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Regular expressions. Commands matching any of them are never sent."
+        },
+        "recall.redactPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra regular expressions to mask. Each whole match is replaced with ***, on top of the built-in secret rules."
+        },
+        "recall.autoFixNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a command fails and your team (or the local AI) has a fix, show it in a notification."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "recall.search",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "recall.insertCommand",
+          "when": "false"
+        },
+        {
+          "command": "recall.reportFixFailed",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "test:unit": "vitest run",
+    "test:integration": "npm run build && tsc -p tsconfig.test.json && node out/test/integration/runTest.js",
+    "test": "npm run typecheck && npm run test:unit && npm run test:integration",
+    "package": "npm run build && vsce package --no-dependencies --skip-license --allow-missing-repository --out recall.vsix"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "~1.93.0",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.23.1",
+    "mocha": "^10.7.3",
+    "typescript": "~5.5.4",
+    "vitest": "^2.1.1"
+  },
+  "keywords": [
+    "terminal",
+    "team",
+    "history",
+    "search",
+    "errors"
+  ]
+}

@@ -1,0 +1,160 @@
+# Plain-English glosses appended to a command before it is embedded, so a question like
+# "undo my last commit but keep the changes" can meet "git reset --soft HEAD~1".
+# Format: <regex, case-insensitive, matched anywhere in the masked command><TAB><phrase>. Every matching line applies.
+# Keep phrases in the words people use when they ask, not in the tool's own vocabulary.
+
+# --- git: undo and history
+\bgit\s+reset\s+--soft\s+HEAD(~1|\^)?\b	undo my last commit but keep the changes staged
+\bgit\s+reset\s+--mixed\b|\bgit\s+reset\s+HEAD~1\s*$	undo the last commit and unstage the changes but keep them in files
+\bgit\s+reset\s+--hard\b	throw away all local changes and reset to a commit
+\bgit\s+revert\b	undo a commit that was already pushed by adding a new commit
+\bgit\s+commit\s+.*--amend\b	change the last commit message or add forgotten files to the last commit
+\bgit\s+reflog\b	find lost commits and recover a deleted branch
+\bgit\s+log\b.*--oneline	show the commit history compactly
+\bgit\s+log\b	show the commit history
+\bgit\s+rebase\s+-i\b	squash, reorder or edit previous commits interactively
+\bgit\s+rebase\b	replay my branch on top of another branch
+\bgit\s+cherry-pick\b	copy a single commit from another branch onto this one
+\bgit\s+bisect\b	find which commit introduced a bug
+\bgit\s+blame\b	see who changed each line of a file
+# --- git: working tree and staging
+\bgit\s+stash(\s+(push|save)\b.*)?\s*$|\bgit\s+stash\s+-u\b	save my uncommitted changes temporarily and clean the working tree
+\bgit\s+stash(\s+(push|save)\b.*)?\s*$|\bgit\s+stash\s+-u\b	put my work in progress aside without committing it
+\bgit\s+stash\s+pop\b	bring back my stashed changes
+\bgit\s+stash\s+list\b	list saved stashes
+\bgit\s+restore\s+--staged\b|\bgit\s+reset\s+HEAD\s+\S	unstage a file but keep the changes
+\bgit\s+restore\s+--staged\b|\bgit\s+reset\s+HEAD\s+\S	remove a file from the staging area
+\bgit\s+restore\s+(?!--staged)\S|\bgit\s+checkout\s+--\s+\S	discard changes to a file
+\bgit\s+clean\s+-[a-z]*f	delete untracked files and folders
+\bgit\s+diff\s+--(staged|cached)\b	show the changes that are staged for commit
+\bgit\s+diff\b	show what I changed
+\bgit\s+add\s+-p\b	stage only some parts of a file
+\bgit\s+add\s+(\.|-A)	stage all changes
+# --- git: branches and remotes
+\bgit\s+(checkout\s+-b|switch\s+-c)\b	create a new branch and switch to it
+\bgit\s+branch\s+-[dD]\b	delete a local branch
+\bgit\s+push\s+\S+\s+--delete\b|\bgit\s+push\s+\S+\s+:\S	delete a remote branch
+\bgit\s+branch\s+-m\b	rename a branch
+\bgit\s+branch\s+(-a|-r|--all)\b	list all branches including remote ones
+\bgit\s+fetch\s+.*--prune\b|\bgit\s+remote\s+prune\b	clean up branches that were deleted on the remote
+\bgit\s+push\s+.*--force-with-lease\b	force push safely after rewriting history
+\bgit\s+push\s+.*(-u|--set-upstream)\b	push a new branch and set its upstream
+\bgit\s+pull\s+--rebase\b	update my branch from the remote without a merge commit
+\bgit\s+remote\s+-v\b	show the remote repository urls
+\bgit\s+remote\s+set-url\b	change the remote repository url
+\bgit\s+merge\s+--abort\b|\bgit\s+rebase\s+--abort\b	cancel a merge or rebase that has conflicts
+\bgit\s+tag\b	create or list release tags
+\bgit\s+submodule\s+update\b	download git submodules
+\bgit\s+config\s+.*user\.(name|email)\b	set my git name and email
+# --- ports and processes
+\bnpx\s+kill-port\b	free a port that is already in use by killing the process
+\bnpx\s+kill-port\b	port is already in use, address already in use error (EADDRINUSE)
+\blsof\s+-i\s*:?\d*|\bnetstat\s+-a|\bss\s+-[a-z]*l	find which process is using a port
+\bkill\s+-9\b|\btaskkill\b|\bStop-Process\b	force kill a stuck process
+\bps\s+aux\b|\bGet-Process\b|\btasklist\b	list running processes
+# --- node / npm
+\bnpm\s+ci\b	clean install dependencies exactly from the lockfile
+\brm\s+-rf\s+node_modules\b|\bRemove-Item\b.*node_modules	delete node_modules to reinstall dependencies from scratch
+\bnpm\s+cache\s+clean\b	clear the npm cache
+\bnpm\s+(install|i)\s+(-D|--save-dev)\b	add a development dependency
+\bnpm\s+(install|i)\s+\S	add a package dependency
+\bnpm\s+(install|i)\s*$	install project dependencies
+\bnpm\s+outdated\b	check which packages have newer versions
+\bnpm\s+update\b	update packages to newer versions
+\bnpm\s+audit\s+fix\b	fix vulnerable dependencies
+\bnpm\s+run\s+dev\b	start the development server
+\bnpm\s+(run\s+)?test\b	run the tests
+\bnpm\s+run\s+build\b	build the project for production
+\bnpm\s+version\s+(patch|minor|major)\b	bump the package version
+\bnpm\s+link\b	use a local package in another project
+\bnvm\s+use\b	switch to another node version
+\bnvm\s+install\b	install a node version
+\bnpx\s+prettier\b	format the code
+\bnpx\s+eslint\b.*--fix	fix lint errors automatically
+# --- docker
+\bdocker\s+ps\s+-a\b	list all containers including stopped ones
+\bdocker\s+ps\b	list running containers
+\bdocker\s+(compose|-compose)\s+up\s+.*-d\b|\bdocker-compose\s+up\s+.*-d\b	start all services in the background
+\bdocker\s+compose\s+up\b.*--build|\bdocker-compose\s+up\b.*--build	rebuild images and start the services
+\bdocker\s+compose\s+down\b.*-v\b|\bdocker-compose\s+down\b.*-v\b	stop the services and delete their data volumes
+\bdocker\s+compose\s+down\b|\bdocker-compose\s+down\b	stop and remove the services
+\bdocker\s+(compose\s+)?logs\s+.*-f\b|\bdocker-compose\s+logs\s+.*-f\b	follow the logs of a container
+\bdocker\s+exec\s+-it\b	open a shell inside a running container
+\bdocker\s+build\b	build a docker image
+\bdocker\s+system\s+prune\b	free disk space by removing unused docker data
+\bdocker\s+image\s+prune\b|\bdocker\s+rmi\b	remove docker images
+\bdocker\s+volume\s+(ls|rm|prune)\b	list or remove docker volumes
+\bdocker\s+stop\b|\bdocker\s+rm\s+-f\b	stop a container
+\bdocker\s+run\b.*\s-p\s	run a container and publish a port
+\bdocker\s+login\b	log in to a container registry
+\bdocker\s+push\b	upload an image to a registry
+# --- kubernetes
+\bkubectl\s+get\s+pods\b	list the pods
+\bkubectl\s+logs\b	show the logs of a pod
+\bkubectl\s+describe\s+pod\b	see why a pod is failing
+\bkubectl\s+rollout\s+restart\b	restart a deployment
+\bkubectl\s+rollout\s+undo\b	roll back a deployment to the previous version
+\bkubectl\s+rollout\s+status\b	wait for a deployment to finish rolling out
+\bkubectl\s+scale\b	change the number of replicas
+\bkubectl\s+port-forward\b	forward a local port to a pod or service
+\bkubectl\s+exec\s+-it\b	open a shell inside a pod
+\bkubectl\s+apply\s+-f\b	apply a kubernetes manifest
+\bkubectl\s+config\s+(use-context|get-contexts|current-context)\b	switch or show the kubernetes cluster context
+\bkubectl\s+delete\s+pod\b	delete a pod so it gets recreated
+\bkubectl\s+get\s+(svc|services)\b	list the services
+\bkubectl\s+top\b	show cpu and memory usage
+# --- python
+\bpython3?\s+-m\s+venv\b|\bvirtualenv\b	create a python virtual environment
+\bsource\s+\S*(venv|\.venv)\S*/activate\b|\\Scripts\\activate	activate the python virtual environment
+\bpip3?\s+install\s+-r\b	install python dependencies from requirements
+\bpip3?\s+freeze\b	save installed python packages to a requirements file
+\bpip3?\s+install\s+--upgrade\s+pip\b	upgrade pip
+\bpytest\b.*-k\b	run only the tests matching a name
+\bpytest\b	run the python tests
+\bpython3?\s+manage\.py\s+migrate\b	apply django database migrations
+\bpython3?\s+manage\.py\s+makemigrations\b	create django migrations
+\bpython3?\s+-m\s+http\.server\b	serve the current folder over http
+\buvicorn\b	start the python api server
+# --- java
+\bmvnw?\b.*-DskipTests\b	build without running the tests
+\bmvnw?\b.*-DskipTests\b	build the java project with maven and skip the tests
+\bmvnw?\b.*\bclean\s+install\b	clean build and install the project
+\bmvnw?\b.*dependency:tree\b	show the dependency tree
+\bmvnw?\b.*spring-boot:run\b|\bgradlew?\b.*bootRun\b	run the spring boot application
+\bmvnw?\b.*\bverify\b	run all tests and checks
+\bgradlew?\b.*\bbuild\b	build the gradle project
+\bjava\s+-jar\b	run a jar file
+# --- files, disk and shell
+\bchmod\s+\+x\b	make a script executable
+\bchmod\s+[0-7]{3}\b	change file permissions
+\bchown\b	change the owner of files
+\bdu\s+-[a-z]*s[a-z]*h|\bdu\s+-[a-z]*h[a-z]*s	check how much disk space a folder uses
+\bdf\s+-h\b	check free disk space
+\btail\s+-f\b|\bGet-Content\b.*-Wait	follow a log file as it grows
+\bfind\s+\S+\s+-name\b|\bGet-ChildItem\b.*-Recurse.*-Filter	find files by name
+\bgrep\s+-[a-z]*r|\brg\s	search for text in files
+\btar\s+-[a-z]*x[a-z]*f	extract a tar archive
+\btar\s+-[a-z]*c[a-z]*f	create a compressed archive
+\bunzip\b|\bExpand-Archive\b	extract a zip file
+\bln\s+-s\b	create a symbolic link
+\bssh-keygen\b	generate a new ssh key
+\bssh-copy-id\b	copy my ssh key to a server
+\bscp\b|\brsync\b	copy files to or from a server
+\bcurl\s+-I\b|\bcurl\s+.*--head\b	check the http headers of a url
+\bcurl\b.*-X\s*POST|\bcurl\b.*\s-d\s	send a post request
+\bexport\s+PATH=|\$env:PATH\s*=|\bsetx\s+PATH\b	add a folder to the path
+\bwhich\b|\bGet-Command\b|\bwhere(\.exe)?\s	find where a program is installed
+\bcrontab\s+-e\b	schedule a recurring job
+\bhistory\b.*\|\s*grep\b	search my shell history
+\bopenssl\s+req\b	create a self-signed certificate
+\bnslookup\b|\bdig\b	look up the dns record of a domain
+\bping\b	check if a host is reachable
+# --- databases
+\bpsql\b	connect to a postgres database
+\bpg_dump\b	back up a postgres database
+\bpg_restore\b	restore a postgres database backup
+\bmysql\s	connect to a mysql database
+\bmysqldump\b	back up a mysql database
+\bredis-cli\b.*\bflushall\b	clear all keys in redis
+\bredis-cli\b	connect to redis
+\bmongosh\b|\bmongo\s	connect to mongodb

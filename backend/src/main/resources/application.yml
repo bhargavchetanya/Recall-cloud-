@@ -1,0 +1,135 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: recall
+  datasource:
+    url: jdbc:postgresql://localhost:5432/recall
+    username: recall
+    password: recall
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: recall
+    password: recall
+    publisher-confirm-type: correlated
+    listener:
+      simple:
+        concurrency: 2
+        max-concurrency: 4
+        prefetch: 10
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+          multiplier: 2
+
+recall:
+  jwt:
+    # Must be at least 32 bytes. docker-compose passes RECALL_JWT_SECRET; there is no default here on purpose.
+    secret: ${RECALL_JWT_SECRET:}
+    ttl: 30d
+  events:
+    max-batch-size: 500
+    raw-error-max-chars: 8192
+    publish-confirm-timeout: 5s
+    # Empty in production. Tests set a random value so each Spring context gets its own queue.
+    instance: ""
+  embedding:
+    # onnx (all-MiniLM-L6-v2, needs scripts/fetch-model.sh) or hashing (no model file, weaker).
+    provider: onnx
+    model-dir: ${RECALL_EMBEDDING_MODEL_DIR:models}
+    cache-size: 4096
+  ranking:
+    # score = cosine-weight*cosine + usage-weight*min(1, ln(1+uses)/ln(1+usage-saturation))
+    #       + recency-weight*exp(-age_days/recency-days) + context-weight*(same repo or cwd)
+    cosine-weight: 0.60
+    usage-weight: 0.15
+    recency-weight: 0.15
+    context-weight: 0.10
+    usage-saturation: 10
+    recency-days: 30
+    threshold: 0.55
+    # Nearest rows fetched from the HNSW index before grouping identical commands.
+    ann-limit: 200
+    # Distinct commands scored after grouping.
+    candidate-limit: 50
+    ef-search: 200
+  ai:
+    # noop (default) or ollama; the ai profile switches to ollama. Unreachable Ollama behaves like noop.
+    provider: noop
+    ollama-url: ${RECALL_OLLAMA_URL:http://localhost:11434}
+    model: ${RECALL_OLLAMA_MODEL:qwen2.5-coder:7b}
+    timeout: 10s
+  rate-limit:
+    # A runaway loop must not flood the queue; the extension backs off on 429.
+    events-per-minute: 100
+  errors:
+    # A stored fix for a similar (not identical) error is offered when the error vectors are at least this close.
+    similarity-threshold: 0.80
+    # A fix with at least this many "didn't work" reports, and more of them than successes, is no longer offered.
+    demote-min-failures: 3
+  learning:
+    # A failure is fixed by a later successful command in the same terminal within this time and command count.
+    window: 10m
+    max-commands: 5
+    # Commands that fix problems in other tools (matched as a prefix after sudo and env assignments are removed).
+    unblockers:
+      - kill
+      - pkill
+      - killall
+      - taskkill
+      - stop-process
+      - fuser -k
+      - npx kill-port
+      - chmod
+      - chown
+      - rm -rf node_modules
+      - rm -rf .venv
+      - rm package-lock.json
+      - export
+      - set
+      - "$env:"
+      - source
+      - nvm use
+      - nvm install
+      - npm install
+      - npm i
+      - npm ci
+      - pip install
+      - docker start
+      - docker compose up
+      - docker-compose up
+      - systemctl start
+      - service
+      - brew services start
+      - mkdir
+      - touch
+      - cp .env.example .env
+      - ssh-add
+      - git config
+      - git stash
+    # Never a fix: moving around and looking.
+    trivial:
+      - cd
+      - ls
+      - dir
+      - ll
+      - clear
+      - cls
+      - pwd
+      - exit
+      - echo
+      - history
+      - whoami
+      - git status
+      - git log
+      - git diff

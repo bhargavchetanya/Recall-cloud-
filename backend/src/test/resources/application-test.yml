@@ -1,0 +1,8 @@
+recall:
+  jwt:
+    secret: test-only-secret-that-is-at-least-32-bytes-long
+  embedding:
+    provider: hashing
+  events:
+    # Each Spring test context gets its own queue so contexts never consume each other's batches.
+    instance: ${random.uuid}

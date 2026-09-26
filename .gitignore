@@ -1,0 +1,22 @@
+# secrets
+.env
+*.pem
+
+# backend
+backend/target/
+backend/models/*
+!backend/models/.gitkeep
+
+# extension
+extension/node_modules/
+extension/dist/
+extension/out/
+extension/.vscode-test/
+extension/*.vsix
+
+# tooling
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+.vscode/
