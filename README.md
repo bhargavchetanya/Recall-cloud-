@@ -22,7 +22,8 @@
   <a href="#-using-recall">Using Recall</a> ·
   <a href="#-troubleshooting">Troubleshooting</a> ·
   <a href="docs/DEMO.md">5-minute demo</a> ·
-  <a href="docs/DEPLOY_AWS.md">Deploy on AWS</a>
+  <a href="docs/DEPLOY_AWS.md">Deploy on AWS</a> ·
+  <a href="https://github.com/bhargavchetanya/recall-playground">Team playground</a>
 </p>
 
 ---
@@ -430,6 +431,8 @@ Recall is most useful when the whole team uses **one** backend.
 4. **One person creates the team** (*Recall: Sign in → Create a team*) and shares the **invite code**.
 5. **Everyone else** installs the extension (step 6), runs **Recall: Set server URL** with `http://192.168.1.20:8080`, and runs *Recall: Sign in → Join a team*.
 
+> **Trying it with friends?** [recall-playground](https://github.com/bhargavchetanya/recall-playground) is a tiny to-do API with 8 challenges (a missing package, a port already in use, a script that won't run, undoing a commit, secrets, offline, another team). One friend fixes each problem; the next one gets the fix from Recall.
+
 Anyone who joins immediately benefits from the team's history. For example, a teammate who hits an error someone else already fixed gets the fix in their very first session.
 
 > [!WARNING]
@@ -643,6 +646,7 @@ All scripts accept `RECALL_SERVER=http://host:port` to target another backend.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): components, data flow, data model
 - [docs/API.md](docs/API.md): every HTTP endpoint with `curl` examples
 - [docs/DEMO.md](docs/DEMO.md): a 5-minute lab demo script
+- [recall-playground](https://github.com/bhargavchetanya/recall-playground): a separate demo project with challenges that show every feature with a real team
 - [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md): deploying on AWS with CloudFormation, and the instructor demo
 - [report/Recall-on-AWS-Report.pdf](report/Recall-on-AWS-Report.pdf): the cloud computing project report, with the architecture diagram and screenshots of the live AWS deployment
 - [docs/DECISIONS.md](docs/DECISIONS.md): every design decision and deviation from the spec
