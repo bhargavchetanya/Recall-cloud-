@@ -1,0 +1,5 @@
+# RECALL_SITE comes from .env: e.g. 3-91-20-7.sslip.io (automatic HTTPS) or :80 (plain HTTP).
+{$RECALL_SITE} {
+	encode gzip
+	reverse_proxy backend:8080
+}

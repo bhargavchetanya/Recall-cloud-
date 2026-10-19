@@ -20,7 +20,8 @@
   <a href="#-step-by-step-installation">Full installation guide</a> ·
   <a href="#-using-recall">Using Recall</a> ·
   <a href="#-troubleshooting">Troubleshooting</a> ·
-  <a href="docs/DEMO.md">5-minute demo</a>
+  <a href="docs/DEMO.md">5-minute demo</a> ·
+  <a href="docs/DEPLOY_AWS.md">Deploy on AWS</a>
 </p>
 
 ---
@@ -399,6 +400,8 @@ Answers are labelled **From your team** (someone on your team ran it), **Unverif
 ## 👥 Sharing Recall with your team
 
 Recall is most useful when the whole team uses **one** backend.
+
+> **On AWS?** [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md) sets it up on one EC2 instance with HTTPS (works in AWS Academy Learner Lab).
 
 1. **Pick one computer or server** that stays on and that everyone can reach on the network. Start Recall there (steps 1–4).
 2. **Set a real secret** in `.env` on that machine, then restart with `docker compose up -d`:
