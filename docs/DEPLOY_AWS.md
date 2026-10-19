@@ -45,15 +45,12 @@ Every push to `main` runs **CI** (all tests) and then **Release**, which publish
 
 Check both workflows are green under the repository's **Actions** tab.
 
-### 1.2 Make the image public (once)
+### 1.2 Check the image is public
 
-GitHub publishes new images as private, and the server cannot download a private image.
-
-1. GitHub → your profile → **Packages** → **recall-backend**.
-2. **Package settings** (bottom right) → **Danger Zone** → **Change visibility** → **Public** → type the name → confirm.
-
-If you skip this, deployment still works, but the server compiles the backend itself and the stack takes about
-15 minutes longer.
+The server downloads the image without logging in to GitHub, so it must be public. It is published from a public
+repository, so it already is. If you ever make the repository private: GitHub → your profile → **Packages** →
+**recall-backend** → **Package settings** → **Change visibility** → **Public**. Without that, deployment still works,
+but the server compiles the backend itself and the stack takes about 15 minutes longer.
 
 ### 1.3 Install the extension in your VS Code
 
@@ -178,7 +175,7 @@ at next.
 | Failure on **Database** | Create the stack again with **DatabaseMode** = `container` (PostgreSQL runs on the server instead of RDS). |
 | Failure on **AppServer** with "instance type" | Create it again with **InstanceType** = `t2.small`. |
 | Failure on **AppServer**: "Failed to receive 1 resource signal" | The setup script failed or ran out of time. With preserved resources: EC2 → `recall-server` → **Actions** → **Monitor and troubleshoot** → **Get system log**, or Session Manager → `sudo tail -100 /var/log/recall-setup.log`. |
-| Stack took about 35 minutes | The image could not be downloaded, so the server compiled it. Make the package public (1.2). |
+| Stack took about 35 minutes | The image could not be downloaded, so the server compiled it. Check the package is public (1.2). |
 | RecallUrl does not open but the stack is complete | Use **HttpFallbackUrl** (plain HTTP on the IP) in the browser and in **Recall: Set server URL**. The HTTPS certificate may still be on its way; the landing page says so. |
 | VS Code shows `Recall ○` | Is the lab still running? Did you run **Recall: Set server URL** with this session's URL? |
 | VS Code says *not signed in* or requests fail with 401 | The server is new each session: **Recall: Sign in** again. |
