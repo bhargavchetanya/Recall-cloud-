@@ -56,6 +56,19 @@ More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
+## 🧭 Two ways to run it
+
+| | Run locally | Run on AWS |
+|---|---|---|
+| **Where the backend runs** | Docker on your computer (or a team server on your network) | EC2 + Amazon RDS, built by one CloudFormation template |
+| **Start it** | `docker compose up -d` ([Quick start](#-quick-start)) | Upload `deploy/aws/recall.yaml` in CloudFormation ([Deploy on AWS](#-deploy-on-aws)) |
+| **Server URL in VS Code** | `http://localhost:8080` (the default) | The stack's `RecallUrl` output, for example `https://3-80-65-109.sslip.io` |
+| **Data** | Kept until you reset it | In an AWS Academy sandbox, deleted when the session ends |
+
+The VS Code extension is the same in both. To switch between them, run **Recall: Set server URL** with the other address, then **Recall: Sign in** (each server has its own accounts).
+
+---
+
 ## 📋 Contents
 
 1. [Requirements](#-requirements)
@@ -96,7 +109,7 @@ Use this if Docker, Node.js and VS Code are already installed and **Docker is ru
 <summary><b>🐧 🍎 Git Bash (Windows), macOS or Linux</b></summary>
 
 ```bash
-git clone <repository-url> recall
+git clone https://github.com/bhargavchetanya/Recall-cloud-.git recall
 cd recall
 docker compose up -d                     # first time: builds the backend, takes a few minutes
 ./scripts/seed-demo.sh                   # optional demo team; prints an invite code
@@ -113,7 +126,7 @@ code --install-extension recall.vsix
 PowerShell 5 does not understand `&&` or Git Bash paths, so run one command per line:
 
 ```powershell
-git clone <repository-url> recall
+git clone https://github.com/bhargavchetanya/Recall-cloud-.git recall
 cd recall
 docker compose up -d
 powershell -ExecutionPolicy Bypass -File scripts\seed-demo.ps1
@@ -124,7 +137,7 @@ code --install-extension recall.vsix
 ```
 </details>
 
-Then **reload VS Code**, run **Recall: Sign in** from the Command Palette, and pick *Join a team* with the invite code the seed printed. The status bar (bottom left) turns into **`Recall ●`**. Done: jump to [Using Recall](#-using-recall).
+Then **reload VS Code**, run **Recall: Sign in** from the Command Palette, and pick *Join a team* with the invite code the seed printed. If you used Recall with another server before (for example on AWS), first run **Recall: Set server URL** with `http://localhost:8080`. The status bar (bottom left) turns into **`Recall ●`**. Done: jump to [Using Recall](#-using-recall).
 
 ---
 
@@ -179,7 +192,7 @@ Each command should print a version. `node -v` must show `v20` or higher.
 ### Step 2 · Get the code
 
 ```bash
-git clone <repository-url> recall
+git clone https://github.com/bhargavchetanya/Recall-cloud-.git recall
 cd recall
 ```
 
@@ -291,6 +304,7 @@ You should see `Extension 'recall.vsix' was successfully installed.` Then **relo
 ### Step 7 · Sign in
 
 1. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> (<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> on macOS) and run **Recall: Sign in**.
+   The extension connects to `http://localhost:8080` by default. If you pointed it at another server before (for example on AWS), first run **Recall: Set server URL** with `http://localhost:8080`.
 2. Pick one:
 
    | Option | When |
