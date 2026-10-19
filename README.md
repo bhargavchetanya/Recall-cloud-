@@ -434,7 +434,7 @@ One CloudFormation template, [`deploy/aws/recall.yaml`](deploy/aws/recall.yaml),
 
 Only HTTPS (and SSH) is open to the internet; the database accepts connections only from the app server. The server pulls the backend image that the Release workflow publishes to `ghcr.io/bhargavchetanya/recall-backend`.
 
-The full guide, with an instructor demo script, troubleshooting and costs, is in [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md). In an AWS Academy sandbox everything is deleted when the session ends; create the stack again next time.
+The full guide, with an instructor demo script, troubleshooting and costs, is in [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md). The project report with screenshots of the live deployment is [report/Recall-on-AWS-Report.pdf](report/Recall-on-AWS-Report.pdf). In an AWS Academy sandbox everything is deleted when the session ends; create the stack again next time.
 
 ---
 
@@ -630,6 +630,7 @@ All scripts accept `RECALL_SERVER=http://host:port` to target another backend.
 - [docs/API.md](docs/API.md): every HTTP endpoint with `curl` examples
 - [docs/DEMO.md](docs/DEMO.md): a 5-minute lab demo script
 - [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md): deploying on AWS with CloudFormation, and the instructor demo
+- [report/Recall-on-AWS-Report.pdf](report/Recall-on-AWS-Report.pdf): the cloud computing project report, with the architecture diagram and screenshots of the live AWS deployment
 - [docs/DECISIONS.md](docs/DECISIONS.md): every design decision and deviation from the spec
 - [PROGRESS.md](PROGRESS.md): what was built, how it was tested, and what surprised us
 </details>
