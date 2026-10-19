@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Recall on AWS: an EC2 instance (Amazon Linux 2023, Docker) running the Recall backend, RabbitMQ and Caddy (HTTPS),
+  with PostgreSQL + pgvector in Amazon RDS. Built for the AWS Academy sandbox: t3.small, us-east-1, vockey,
+  LabInstanceProfile. The stack reports CREATE_COMPLETE only once Recall answers its health check.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Usually leave these as they are }
+        Parameters: [DatabaseMode, LoadDemoData, InstanceType, KeyName, InstanceProfile, SshCidr]
+      - Label: { default: Where the code comes from }
+        Parameters: [GitRepo, GitBranch, BackendImage, LatestAmi]
+
+Parameters:
+  DatabaseMode:
+    Type: String
+    Default: rds
+    AllowedValues: [rds, container]
+    Description: >-
+      rds = Amazon RDS for PostgreSQL (managed; adds about 10 minutes to stack creation).
+      container = PostgreSQL in Docker on the same instance (faster, no managed database).
+  LoadDemoData:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Load the demo team (two teammates, about 200 commands, 15 learned fixes).
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t2.small]
+    Description: The largest types the AWS Academy sandbox allows (2 GB RAM).
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: vockey
+    Description: SSH key pair. In AWS Academy this is vockey (AWS Details → Download PEM gives labsuser.pem).
+  InstanceProfile:
+    Type: String
+    Default: LabInstanceProfile
+    Description: >-
+      Instance profile, for browser access through Session Manager (EC2 → Connect). Leave empty for none.
+  SshCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: '^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$'
+    Description: Who may SSH to the instance. Narrow it to your own address (x.x.x.x/32) if you can.
+  GitRepo:
+    Type: String
+    Default: https://github.com/bhargavchetanya/Recall-cloud-.git
+  GitBranch:
+    Type: String
+    Default: main
+  BackendImage:
+    Type: String
+    Default: ghcr.io/bhargavchetanya/recall-backend:latest
+    Description: Prebuilt by GitHub Actions. If it cannot be pulled, the instance builds it from source (slower).
+  LatestAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Latest Amazon Linux 2023 AMI, looked up at deploy time.
+
+Conditions:
+  UseRds: !Equals [!Ref DatabaseMode, rds]
+  HasInstanceProfile: !Not [!Equals [!Ref InstanceProfile, '']]
+
+Resources:
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Recall - HTTPS and HTTP from anywhere, SSH from SshCidr
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS (VS Code and browsers) }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP (certificate challenge and fallback) }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref SshCidr, Description: SSH }
+      Tags:
+        - { Key: Name, Value: !Sub '${AWS::StackName}-app' }
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: UseRds
+    Properties:
+      GroupDescription: Recall - PostgreSQL only from the app instance
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !GetAtt AppSecurityGroup.GroupId,
+            Description: PostgreSQL from the Recall instance }
+      Tags:
+        - { Key: Name, Value: !Sub '${AWS::StackName}-db' }
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    Condition: UseRds
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: postgres
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: '20'
+      StorageType: gp2
+      DBName: recall
+      MasterUsername: recall
+      # The stack's own UUID: unique per stack and never typed by anyone. The database is reachable only from
+      # the app instance's security group.
+      MasterUserPassword: !Select [2, !Split ['/', !Ref AWS::StackId]]
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 0
+      MonitoringInterval: 0
+      EnablePerformanceInsights: false
+      DeletionProtection: false
+      VPCSecurityGroups: [!GetAtt DbSecurityGroup.GroupId]
+      Tags:
+        - { Key: Name, Value: !Sub '${AWS::StackName}-db' }
+
+  AppServer:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+    Properties:
+      ImageId: !Ref LatestAmi
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !If [HasInstanceProfile, !Ref InstanceProfile, !Ref AWS::NoValue]
+      SecurityGroupIds: [!GetAtt AppSecurityGroup.GroupId]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 20, VolumeType: gp3, DeleteOnTermination: true }
+      Tags:
+        - { Key: Name, Value: !Sub '${AWS::StackName}-server' }
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            # Progress: /var/log/recall-setup.log on the instance, or EC2 → Actions → Monitor → Get system log.
+            exec > >(tee -a /var/log/recall-setup.log | logger -t recall-setup -s 2>/dev/console) 2>&1
+            signal() { /opt/aws/bin/cfn-signal -e "$1" --stack '${AWS::StackName}' --resource AppServer --region '${AWS::Region}'; }
+            dnf install -y git aws-cfn-bootstrap || { signal 1; exit 1; }
+            cat > /etc/recall.env <<'EOF'
+            RECALL_DB_HOST=${DbHost}
+            RECALL_DB_PASSWORD=${DbPassword}
+            RECALL_IMAGE=${BackendImage}
+            RECALL_SEED=${LoadDemoData}
+            EOF
+            chmod 600 /etc/recall.env
+            rm -rf /opt/recall
+            if git clone --depth 1 --branch '${GitBranch}' '${GitRepo}' /opt/recall && /opt/recall/deploy/aws/setup.sh; then
+              signal 0
+            else
+              signal 1
+            fi
+          - DbHost: !If [UseRds, !GetAtt Database.Endpoint.Address, postgres]
+            DbPassword: !Select [2, !Split ['/', !Ref AWS::StackId]]
+
+Outputs:
+  RecallUrl:
+    Description: Open this in a browser for the invite code and demo accounts; paste it into "Recall - Set server URL".
+    Value: !Join ['', ['https://', !Join ['-', !Split ['.', !GetAtt AppServer.PublicIp]], '.sslip.io']]
+  HttpFallbackUrl:
+    Description: Plain-HTTP address, if the HTTPS certificate could not be issued.
+    Value: !Sub 'http://${AppServer.PublicIp}'
+  HealthCheck:
+    Description: Should show "status":"UP".
+    Value: !Join ['', ['https://', !Join ['-', !Split ['.', !GetAtt AppServer.PublicIp]], '.sslip.io/api/v1/health']]
+  SshCommand:
+    Description: From the folder where labsuser.pem was downloaded.
+    Value: !Sub 'ssh -i labsuser.pem ec2-user@${AppServer.PublicIp}'
+  DatabaseEndpoint:
+    Condition: UseRds
+    Description: Amazon RDS for PostgreSQL endpoint (private; reachable only from the app instance).
+    Value: !GetAtt Database.Endpoint.Address

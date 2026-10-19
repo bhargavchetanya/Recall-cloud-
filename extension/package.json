@@ -24,6 +24,11 @@
         "category": "Recall"
       },
       {
+        "command": "recall.setServerUrl",
+        "title": "Set server URL",
+        "category": "Recall"
+      },
+      {
         "command": "recall.search",
         "title": "Search…",
         "category": "Recall"

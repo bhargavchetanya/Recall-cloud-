@@ -1,0 +1,91 @@
+# What runs on the EC2 instance (see docs/DEPLOY_AWS.md). setup.sh writes .env next to this file and starts it.
+#
+# The backend image is prebuilt by GitHub Actions (.github/workflows/release.yml), so the instance only downloads it.
+# PostgreSQL normally lives in Amazon RDS; the "localdb" profile runs it in a container instead
+# (CloudFormation parameter DatabaseMode=container).
+# Only Caddy is reachable from outside; the backend listens on 127.0.0.1 for setup.sh's health check and demo seed.
+
+name: recall
+
+services:
+  postgres:
+    profiles: [localdb]
+    image: pgvector/pgvector:pg16
+    mem_limit: 384m
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: recall
+      POSTGRES_USER: recall
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recall -d recall"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    mem_limit: 384m
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: recall
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  backend:
+    image: ${RECALL_IMAGE:?}
+    mem_limit: 1g
+    restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:?}:5432/recall
+      SPRING_DATASOURCE_USERNAME: recall
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: recall
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?}
+      RECALL_JWT_SECRET: ${RECALL_JWT_SECRET:?}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/v1/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.8
+    mem_limit: 128m
+    restart: unless-stopped
+    environment:
+      RECALL_SITE: ${RECALL_SITE:?}
+      RECALL_IP: ${RECALL_IP:?}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

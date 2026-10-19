@@ -401,7 +401,7 @@ Answers are labelled **From your team** (someone on your team ran it), **Unverif
 
 Recall is most useful when the whole team uses **one** backend.
 
-> **On AWS?** [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md) sets it up on one EC2 instance with HTTPS (works in AWS Academy Learner Lab).
+> **On AWS?** [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md) builds everything (EC2, RDS, HTTPS, demo data) from one CloudFormation template, inside an AWS Academy sandbox.
 
 1. **Pick one computer or server** that stays on and that everyone can reach on the network. Start Recall there (steps 1–4).
 2. **Set a real secret** in `.env` on that machine, then restart with `docker compose up -d`:

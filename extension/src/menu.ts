@@ -7,6 +7,8 @@ export interface MenuItem {
 
 export interface MenuState {
   signedIn: boolean;
+  connected: boolean;
+  serverUrl: string;
   capturing: boolean;
   hasLastFix: boolean;
   queued: number;
@@ -15,6 +17,10 @@ export interface MenuState {
 /** The status bar menu: what makes sense right now, most useful first. */
 export function menuItems(s: MenuState): MenuItem[] {
   const items: MenuItem[] = [];
+  const setServer = { label: '$(server) Set server URL…', command: 'recall.setServerUrl', description: s.serverUrl };
+  if (!s.connected) {
+    items.push({ ...setServer, description: `${s.serverUrl} is not reachable` });
+  }
   if (!s.signedIn) {
     items.push({ label: '$(account) Sign in…', command: 'recall.signIn', description: 'Sign in, join a team or create one' });
   }
@@ -33,6 +39,9 @@ export function menuItems(s: MenuState): MenuItem[] {
       command: 'recall.flush',
       description: `${s.queued} waiting`,
     });
+  }
+  if (s.connected) {
+    items.push(setServer);
   }
   items.push({ label: '$(output) Show log', command: 'recall.showLog' });
   if (s.signedIn) {

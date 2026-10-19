@@ -1,380 +1,212 @@
-# Deploying Recall on AWS (AWS Academy Learner Lab)
+# Deploying Recall on AWS (AWS Academy sandbox)
 
-The complete roadmap: set up the server once, connect your team, and keep it running across 4-hour lab sessions.
+One CloudFormation template builds the whole system in your AWS Academy sandbox: upload a file, click **Submit**, wait
+about 20 minutes, open a URL. It is built for the *AWS Academy Cloud Developing* sandbox rules (us-east-1, t2/t3
+small instances, RDS PostgreSQL allowed, `vockey`, `LabInstanceProfile`).
 
 ```mermaid
 flowchart LR
-    subgraph laptops["Each teammate's laptop (VS Code extension only)"]
-        a["You"]
-        b["Teammate 1"]
-        c["Teammate 2"]
+    gh["GitHub Actions<br/>tests · builds image · builds recall.vsix"] -- "ghcr.io image" --> ec2
+    vsc["VS Code + Recall extension<br/>(you, teammates, instructor)"] -- "HTTPS :443" --> caddy
+    subgraph cfn["CloudFormation stack  ·  deploy/aws/recall.yaml"]
+        subgraph ec2["EC2 t3.small · Amazon Linux 2023 · Docker"]
+            caddy["Caddy<br/>HTTPS + landing page"] --> api["Recall backend<br/>Spring Boot"]
+            api --> mq[["RabbitMQ"]]
+        end
+        api -- "5432, app security group only" --> rds[("Amazon RDS<br/>PostgreSQL + pgvector")]
     end
-    subgraph ec2["AWS EC2 · t3.medium · Ubuntu 24.04 · Elastic IP"]
-        caddy["Caddy<br/>HTTPS (Let's Encrypt)"] --> api["Recall backend<br/>Spring Boot"]
-        api --> mq[["RabbitMQ"]]
-        api --> db[("PostgreSQL 16 + pgvector")]
-    end
-    a & b & c -- "HTTPS :443" --> caddy
 ```
 
-**Who does what**
+> **The sandbox deletes everything when the session timer reaches 0:00.** That is why the whole setup is one
+> template: each session you create the stack again, and it comes back with the demo data already loaded. Real team
+> data does not survive between sessions.
 
-| Who | Needs | Does |
-|---|---|---|
-| **You (server owner)** | AWS Academy Learner Lab, a laptop with Git, Node.js 20+ and VS Code | Sets up the server once, starts the lab for each session, shares the extension |
-| **Teammates** | Only VS Code | Install the extension, set the URL, join the team. No Docker, AWS or code needed. |
+## Contents
 
-**Roadmap at a glance**
+1. [One-time setup](#1-one-time-setup-10-minutes) (10 minutes, once)
+2. [Every session: create the stack](#2-every-session-create-the-stack-3-clicks-20-minutes-waiting) (3 clicks, 20 minutes of waiting)
+3. [Connect VS Code](#3-connect-vs-code-2-minutes) (2 minutes)
+4. [Demo for the instructor](#4-demo-for-the-instructor-10-minutes) (10 minutes)
+5. [Connect teammates](#5-connect-teammates)
+6. [Troubleshooting](#6-troubleshooting)
+7. [What the template creates, and cost](#7-what-the-template-creates-and-cost)
 
-| Phase | What | Who | Time |
+---
+
+## 1. One-time setup (10 minutes)
+
+### 1.1 Let GitHub build everything
+
+Every push to `main` runs **CI** (all tests) and then **Release**, which publishes:
+
+- the backend image `ghcr.io/bhargavchetanya/recall-backend:latest`, which the server downloads instead of compiling;
+- `recall.vsix`, the VS Code extension, on the repository's
+  [Releases page](https://github.com/bhargavchetanya/Recall-cloud-/releases/latest).
+
+Check both workflows are green under the repository's **Actions** tab.
+
+### 1.2 Make the image public (once)
+
+GitHub publishes new images as private, and the server cannot download a private image.
+
+1. GitHub → your profile → **Packages** → **recall-backend**.
+2. **Package settings** (bottom right) → **Danger Zone** → **Change visibility** → **Public** → type the name → confirm.
+
+If you skip this, deployment still works, but the server compiles the backend itself and the stack takes about
+15 minutes longer.
+
+### 1.3 Install the extension in your VS Code
+
+Download `recall.vsix` from the [Releases page](https://github.com/bhargavchetanya/Recall-cloud-/releases/latest).
+In VS Code: **Extensions** panel → **⋯** (top of the panel) → **Install from VSIX…** → choose `recall.vsix` →
+reload when asked.
+
+### 1.4 Have the template file at hand
+
+It is `deploy/aws/recall.yaml` in your copy of this repository. Or download it:
+[recall.yaml](https://raw.githubusercontent.com/bhargavchetanya/Recall-cloud-/main/deploy/aws/recall.yaml)
+→ **Cmd+S** / **Ctrl+S** → save as `recall.yaml`.
+
+---
+
+## 2. Every session: create the stack (3 clicks, 20 minutes waiting)
+
+### 2.1 Start the lab
+
+1. Canvas → **AWS Academy Cloud Developing** → **Modules** → **Sandbox**.
+2. **Start Lab**. Wait until the dot next to **AWS** is **green**.
+3. Click **AWS** to open the AWS Console. Check the region at the top right is **N. Virginia (us-east-1)**.
+
+> If the lab page says **"Please login again"**, your browser is blocking cross-site cookies. Use Chrome, or in
+> Safari turn off *Settings → Privacy → Prevent cross-site tracking*. Open the lab only from Canvas.
+
+### 2.2 Create the stack
+
+1. In the console search bar type **CloudFormation** → open it.
+2. **Create stack** → **With new resources (standard)**.
+3. **Choose an existing template** → **Upload a template file** → **Choose file** → `recall.yaml` → **Next**.
+4. **Stack name**: `recall`. Leave every parameter as it is → **Next**.
+5. **Configure stack options**: change nothing → **Next**.
+6. **Review** → **Submit**.
+
+### 2.3 Wait for CREATE_COMPLETE
+
+The stack shows **CREATE_IN_PROGRESS**. It takes about **20 minutes**: RDS needs about 10, then the server installs
+Docker, downloads Recall, starts it, loads the demo data and gets the HTTPS certificate. The stack turns
+**CREATE_COMPLETE** only once Recall actually answers, so when it is green, it works.
+
+Watch it in the **Events** tab. While you wait, click **Start Lab** once more so the 4-hour timer restarts.
+
+### 2.4 Open Recall
+
+**Outputs** tab → click **RecallUrl** (for example `https://3-91-20-7.sslip.io`). The landing page shows the server
+URL, the demo team's invite code and the demo accounts.
+
+---
+
+## 3. Connect VS Code (2 minutes)
+
+1. Command Palette (**Cmd+Shift+P** / **Ctrl+Shift+P**) → **Recall: Set server URL** → paste the **RecallUrl** →
+   Enter. Recall checks the connection; the status bar (bottom left) shows **`Recall ●`**.
+2. Click **Sign in** in the notification (or Command Palette → **Recall: Sign in**) → **Sign in** →
+   `daksh@recall.demo` / `recall-demo-2026`.
+3. Press **Cmd+Alt+R** (macOS) or **Ctrl+Alt+R** (Windows/Linux) and type
+   *undo my last commit but keep the changes*.
+
+The URL is new every session, so repeat step 1 each time; signing in again is needed too, because the server is new.
+
+---
+
+## 4. Demo for the instructor (10 minutes)
+
+**Before the demo (25 minutes ahead):** start the lab, create the stack (section 2), click **Start Lab** again
+while it builds, then connect VS Code (section 3). Keep these tabs open: CloudFormation (the stack), EC2, RDS,
+the landing page, and the repository's GitHub Actions page.
+
+| # | Show | Where | Cloud idea it demonstrates |
 |---|---|---|---|
-| [0](#phase-0--before-you-start) | Check you have everything | You | 5 min |
-| [1](#phase-1--set-up-the-server-once) | Create the server and start Recall | You, once | 30–40 min |
-| [2](#phase-2--set-up-your-own-vs-code-and-create-the-team) | Build the extension and create the team | You, once | 10 min |
-| [3](#phase-3--connect-each-teammate) | Connect each teammate | Each teammate, once | 3 min |
-| [4](#phase-4--every-lab-session) | Start, extend and resume sessions | You, every session | 3 min |
-| [5](#phase-5--updating-to-new-code) | Deploy new code | You, when code changes | 5 min |
-| [6](#phase-6--demo-day-checklist) | Demo day checklist | Everyone | 30 min before |
-| [7](#phase-7--end-of-the-course) | End of the course | You | 10 min |
+| 1 | The stack's **Resources** tab: security groups, RDS instance, EC2 instance, all from one file | CloudFormation | Infrastructure as Code |
+| 2 | The template itself (`deploy/aws/recall.yaml`), parameters such as `DatabaseMode` | GitHub / editor | Repeatable, parameterised deployments |
+| 3 | The RDS database: engine PostgreSQL, not publicly accessible | RDS → Databases | Managed services |
+| 4 | Security groups: app allows 80/443 (and 22); the database allows 5432 **only from the app's security group** | EC2 → Security Groups | Network isolation, least privilege |
+| 5 | **Actions** tab: CI runs the tests, Release builds the image and `recall.vsix` | GitHub | CI/CD, container registry |
+| 6 | The landing page and `/api/v1/health` (`db`, `queue`, `embedder` all UP) | Browser | Health checks |
+| 7 | **Search by meaning**: Cmd/Ctrl+Alt+R → *undo my last commit but keep the changes* → `git reset --soft HEAD~1`, with who used it and when | VS Code | The product |
+| 8 | **Learned fix**: in VS Code's terminal, inside any git repository, run `git switch recall-demo`. It fails, and Recall offers the fix a teammate found for exactly that error | VS Code | The product |
+| 9 | **Team isolation**: Command Palette → **Recall: Sign out** → **Sign in** → **Create a team** → search again: nothing from the demo team is visible | VS Code | Multi-tenancy |
+| 10 | **Resilience**: stop the backend (below), run a few commands (status bar shows them queued), start it again, they arrive | EC2 Session Manager + VS Code | Asynchronous messaging, fault tolerance |
 
-> Learner Lab rules (regions, allowed instance types, budget) can differ a little between courses. If a step is
-> blocked, open the **Readme** button on your lab page.
-
----
-
-## Phase 0 — Before you start
-
-- [ ] **You have a Learner Lab.** In Canvas → your AWS Academy course → **Modules**, there is an item called
-      **Learner Lab** (or "Sandbox Environment"). The guided labs inside *Cloud Foundations* or *Cloud Developing*
-      delete everything when they end, so they cannot host Recall. No Learner Lab? Ask your instructor for
-      "AWS Academy Learner Lab" access.
-- [ ] **Your laptop has** Git, Node.js 20+ (`node -v`) and VS Code 1.93+ (`code --version`).
-- [ ] **You have a copy of this repository** on your laptop:
-      ```bash
-      git clone https://github.com/bhargavchetanya/Recall-cloud-.git recall
-      ```
-- [ ] **You know your lab budget.** The lab page shows "Used $X of $Y". See [Cost](#cost-and-how-many-sessions).
-
----
-
-## Phase 1 — Set up the server (once)
-
-### Step 1.1 · Start the lab and get the key
-
-1. AWS Academy → your course → **Modules** → **Learner Lab** → **Start Lab**.
-2. Wait until the dot next to **AWS** turns **green** (1–3 minutes).
-3. Click **AWS Details** → **Download PEM**. This saves `labsuser.pem`, the key that lets you log in to the server.
-4. **macOS / Linux**: protect the key, or SSH refuses to use it:
-   ```bash
-   chmod 400 ~/Downloads/labsuser.pem
-   ```
-   **Windows**: keep it in `Downloads`; if SSH later says the key's permissions are too open, run in PowerShell:
-   ```powershell
-   icacls $env:USERPROFILE\Downloads\labsuser.pem /inheritance:r /grant:r "$($env:USERNAME):(R)"
-   ```
-5. Click the green **AWS** dot. The AWS Console opens. Note the region at the top right (usually
-   **N. Virginia, us-east-1**) and stay in it for every step.
-
-### Step 1.2 · Launch the EC2 instance
-
-Search **EC2** in the console → **Launch instance**, and fill in:
-
-| Field | Value | Why |
-|---|---|---|
-| **Name** | `recall` | So you can find it |
-| **Application and OS Images** | **Ubuntu** → **Ubuntu Server 24.04 LTS**, 64-bit (x86) | What the setup script expects |
-| **Instance type** | **t3.medium** (2 vCPU, 4 GB) | Smaller types run out of memory |
-| **Key pair** | **vockey** | Matches `labsuser.pem` |
-| **Network settings** → **Edit** → **Create security group** | Name: `recall-sg` | The firewall |
-| Inbound rule 1 | **SSH**, port 22, source **My IP** | Only you can log in |
-| **Add security group rule** | **HTTP**, port 80, source **Anywhere** | Needed to get the HTTPS certificate |
-| **Add security group rule** | **HTTPS**, port 443, source **Anywhere** | How teammates reach Recall |
-| **Configure storage** | **20** GiB, **gp3** | Room for Docker images and data |
-
-Click **Launch instance** → **View all instances**. Wait until **Instance state** is **Running** and
-**Status check** shows **2/2 checks passed** (2–3 minutes).
-
-### Step 1.3 · Give it a fixed address (Elastic IP)
-
-Without this, the server gets a new IP every session and the URL changes for everyone.
-
-1. EC2 left menu → **Network & Security** → **Elastic IPs** → **Allocate Elastic IP address** → **Allocate**.
-2. Select the new address → **Actions** → **Associate Elastic IP address**.
-3. **Resource type**: Instance · **Instance**: `recall` → **Associate**.
-4. **Write the IP down**, e.g. `3.91.20.7`. Every example below uses this; replace it with yours.
-
-### Step 1.4 · Log in to the server
-
-On your laptop (Terminal on macOS, PowerShell on Windows):
+**Stopping and starting the backend for step 10.** EC2 → Instances → `recall-server` → **Connect** →
+**Session Manager** → **Connect** (a terminal opens in the browser; no SSH key needed). Then:
 
 ```bash
-ssh -i ~/Downloads/labsuser.pem ubuntu@3.91.20.7
-```
-
-Type `yes` the first time. You are in when the prompt looks like `ubuntu@ip-172-31-...:~$`.
-
-### Step 1.5 · Install and start Recall
-
-On the server:
-
-```bash
-git clone https://github.com/bhargavchetanya/Recall-cloud-.git recall
+sudo docker compose -f /opt/recall/deploy/aws/docker-compose.yml stop backend
 ```
 
 ```bash
-cd recall && sudo ./deploy/aws/bootstrap.sh
+sudo docker compose -f /opt/recall/deploy/aws/docker-compose.yml start backend
 ```
 
-What it does (5–10 minutes the first time):
+Show the running containers with:
 
-1. Installs Docker and Docker Compose.
-2. Adds 2 GB of swap so the build does not run out of memory.
-3. Creates `.env` with random database, RabbitMQ and login-token secrets.
-4. Builds the backend and starts PostgreSQL, RabbitMQ, the backend and Caddy.
-5. Gets an HTTPS certificate for `3-91-20-7.sslip.io` and waits until Recall answers.
-
-It ends with:
-
-```
-Recall is up: https://3-91-20-7.sslip.io
-Set recall.serverUrl to https://3-91-20-7.sslip.io in VS Code.
-```
-
-**This URL is your server address.** [sslip.io](https://sslip.io) is a free DNS service: `3-91-20-7.sslip.io` points
-to `3.91.20.7`, so you get real HTTPS without buying a domain.
-
-### Step 1.6 · Check it
-
-Open `https://3-91-20-7.sslip.io/api/v1/health` in a browser. You should see `"status":"UP"`.
-
-Type `exit` to leave the server.
-
-### Step 1.7 · Load demo data (optional)
-
-On your laptop, in the repository folder. It creates a demo team with realistic history and prints its invite code.
-
-macOS / Linux / Git Bash:
 ```bash
-RECALL_SERVER=https://3-91-20-7.sslip.io ./scripts/seed-demo.sh
-```
-
-Windows PowerShell:
-```powershell
-$env:RECALL_SERVER="https://3-91-20-7.sslip.io"; powershell -ExecutionPolicy Bypass -File scripts\seed-demo.ps1
+sudo docker compose -f /opt/recall/deploy/aws/docker-compose.yml ps
 ```
 
 ---
 
-## Phase 2 — Set up your own VS Code and create the team
+## 5. Connect teammates
 
-### Step 2.1 · Build the extension file
+Each teammate needs only VS Code:
 
-On your laptop:
+1. Install `recall.vsix` from the [Releases page](https://github.com/bhargavchetanya/Recall-cloud-/releases/latest)
+   (Extensions → **⋯** → **Install from VSIX…**). Once.
+2. Each session: **Recall: Set server URL** → the RecallUrl you send them.
+3. **Recall: Sign in** → **Join a team** with the invite code on the landing page (or sign in with a demo account).
 
-```bash
-cd extension && npm ci && npm run package
-```
-
-This creates **`extension/recall.vsix`**, the file every teammate installs.
-
-### Step 2.2 · Install it
-
-VS Code → **Extensions** panel → **⋯** (top of the panel) → **Install from VSIX…** → choose `recall.vsix` →
-reload VS Code when asked.
-
-### Step 2.3 · Point it at the server
-
-**Settings** (Ctrl+, / Cmd+,) → search `recall.serverUrl` → enter `https://3-91-20-7.sslip.io`
-(no trailing slash or path).
-
-### Step 2.4 · Create the team
-
-Command Palette (Ctrl+Shift+P / Cmd+Shift+P) → **Recall: Sign in** → **Create a team** → enter a team name, your
-email, display name and password. Recall shows the **invite code**; click **Copy invite code**.
-
-The bottom-left of VS Code now shows **`Recall ●`**.
-
-### Step 2.5 · Share with your teammates
-
-Send them three things:
-
-1. `recall.vsix`
-2. The server URL, e.g. `https://3-91-20-7.sslip.io`
-3. The invite code
+Remember the limits of the sandbox: the server exists only while your session runs, and its data is deleted when the
+session ends. While it is down, teammates' commands queue on their laptops and are sent to whichever server they point
+at next.
 
 ---
 
-## Phase 3 — Connect each teammate
+## 6. Troubleshooting
 
-Each teammate does this once, in about 3 minutes. They need only VS Code.
-
-1. **Install**: Extensions → **⋯** → **Install from VSIX…** → `recall.vsix` → reload.
-2. **Server**: Settings → `recall.serverUrl` → paste the URL.
-3. **Join**: Command Palette → **Recall: Sign in** → **Join a team** → invite code, email, name, password.
-4. **Check**: bottom-left shows **`Recall ●`**. `Recall ○` means the server is not reachable; see
-   [Troubleshooting](#troubleshooting).
-
-**Using it:**
-
-| Action | How |
+| Problem | What to do |
 |---|---|
-| Record commands | Nothing to do: run commands in VS Code's terminal as usual |
-| Search the team's commands | **Ctrl+Alt+R** (Windows/Linux) or **Cmd+Alt+R** (macOS), then type in plain words |
-| Get a teammate's fix | Run a failing command; if the team solved that error before, a notification offers the fix |
-| Keep a command private | Start it with a space, or add a pattern to `recall.ignorePatterns` |
-
-Passwords and tokens in commands are masked before anything leaves the laptop.
-
-**Important:** the server runs only while **your** lab session is running, because the lab belongs to your account.
-When it is off, teammates' commands wait in a queue on their laptops and upload automatically when it is back.
-Nothing is lost, but search and fixes do not work in the meantime. Tell the team when you start a session.
-
-Another team can use the same server: one of them picks **Create a team** and shares their own invite code. Teams
-never see each other's commands or fixes.
+| Stack goes to **ROLLBACK_IN_PROGRESS** | Open **Events** and find the first red **CREATE_FAILED** line; its reason says what failed. Delete the stack and create it again. To keep the server for debugging, choose **Preserve successfully provisioned resources** under *Stack failure options* on the **Configure stack options** page. |
+| Failure on **Database** | Create the stack again with **DatabaseMode** = `container` (PostgreSQL runs on the server instead of RDS). |
+| Failure on **AppServer** with "instance type" | Create it again with **InstanceType** = `t2.small`. |
+| Failure on **AppServer**: "Failed to receive 1 resource signal" | The setup script failed or ran out of time. With preserved resources: EC2 → `recall-server` → **Actions** → **Monitor and troubleshoot** → **Get system log**, or Session Manager → `sudo tail -100 /var/log/recall-setup.log`. |
+| Stack took about 35 minutes | The image could not be downloaded, so the server compiled it. Make the package public (1.2). |
+| RecallUrl does not open but the stack is complete | Use **HttpFallbackUrl** (plain HTTP on the IP) in the browser and in **Recall: Set server URL**. The HTTPS certificate may still be on its way; the landing page says so. |
+| VS Code shows `Recall ○` | Is the lab still running? Did you run **Recall: Set server URL** with this session's URL? |
+| VS Code says *not signed in* or requests fail with 401 | The server is new each session: **Recall: Sign in** again. |
+| The lab page says *Please login again* | See the note in 2.1. |
 
 ---
 
-## Phase 4 — Every lab session
+## 7. What the template creates, and cost
 
-### Starting a session (about 3 minutes)
-
-1. AWS Academy → Learner Lab → **Start Lab**. Wait for the green dot.
-2. Wait about 2 minutes. The EC2 instance starts, and Docker restarts every part of Recall by itself.
-3. Open `https://3-91-20-7.sslip.io/api/v1/health` and check for `"status":"UP"`.
-4. Tell your teammates it is live.
-
-No SSH and no commands. The Elastic IP keeps the URL the same.
-
-**If the health check is not UP after 3 minutes:** EC2 → **Instances** → `recall` → **Instance state** → **Start**.
-Wait 2 minutes and check again.
-
-### During a session: the 4-hour timer
-
-The lab page shows the time left. **Click Start Lab again before it reaches 0** to reset it to 4 hours. There is no
-limit on how often you do this.
-
-### When the session ends
-
-When the timer reaches 0, AWS **stops** the instance:
-
-- **Nothing is deleted.** Teams, commands and fixes stay on the server's disk.
-- The URL does not change.
-- To bring it back, follow [Starting a session](#starting-a-session-about-3-minutes) again.
-
-You can start as many sessions as you like until the course ends. What limits you is the credit budget, below.
-
----
-
-## Phase 5 — Updating to new code
-
-1. Push the change to GitHub from your laptop.
-2. Start the lab if it is not running, then:
-   ```bash
-   ssh -i ~/Downloads/labsuser.pem ubuntu@3.91.20.7
-   ```
-   ```bash
-   cd recall && sudo ./deploy/aws/deploy.sh --pull
-   ```
-3. If the change touched the extension, rebuild `recall.vsix` (Step 2.1) and send it to the team again.
-
----
-
-## Phase 6 — Demo day checklist
-
-**30 minutes before**
-
-- [ ] **Start Lab**, then click it once more so you have a full 4 hours.
-- [ ] Health URL shows `"status":"UP"`.
-- [ ] Demo data is loaded (Step 1.7), so search has something to find.
-- [ ] Every presenting laptop shows **`Recall ●`**.
-- [ ] AWS Console tabs are open on EC2 Instances, Security Groups and Elastic IPs.
-
-**The demo (about 5 minutes)**
-
-1. **The cloud setup.** Show the EC2 instance, the security group (only 22, 80, 443 open) and the Elastic IP. Over
-   SSH, run `sudo docker compose -f docker-compose.yml -f deploy/aws/docker-compose.prod.yml ps` to show the four
-   containers.
-2. **Search by meaning.** Cmd/Ctrl+Alt+R → *"undo my last commit but keep the changes"* → `git reset --soft HEAD~1`,
-   with who used it and when.
-3. **Learned fix.** Run a command that fails, then the command that fixes it. On a teammate's laptop, run the failing
-   command: Recall offers the fix.
-4. **Team isolation.** Sign in to a second team in another VS Code window and search: it sees none of the first
-   team's commands.
-5. **Resilience.** On the server, `sudo docker compose -f docker-compose.yml -f deploy/aws/docker-compose.prod.yml stop backend`,
-   keep running commands (they queue), then `... start backend` and show they arrive.
-
-[DEMO.md](DEMO.md) has a longer script.
-
----
-
-## Phase 7 — End of the course
-
-When the course ends, AWS Academy deletes the lab and everything in it. Before that:
-
-- [ ] Take screenshots for your report (AWS Console, the demo, the health URL).
-- [ ] If your instructor wants it, release the Elastic IP (EC2 → Elastic IPs → **Actions** → **Release**) and
-      terminate the instance, to stop using credit.
-
----
-
-## Cost and how many sessions
-
-Learner Lab uses a fixed credit budget from your course (shown as "Used $X of $Y") and never charges a card.
-Approximate costs in us-east-1:
-
-| What | Cost | Charged |
-|---|---|---|
-| t3.medium server | about $0.04/hour, so **about $0.17 per 4-hour session** | Only while running |
-| 20 GiB gp3 disk | about $1.60/month | Always, even when stopped |
-| Elastic IP | about $3.60/month | Always, even when stopped |
-
-- **A few sessions a week:** about $6–8/month. A $50 budget lasts the semester.
-- **Running 24/7** (extending the timer over and over): about $35/month. A $50 budget runs out in about 6 weeks.
-
-**If the budget runs out, the lab is deactivated and its resources can be deleted.** Check the budget every week or
-two, and save some for the final evaluation.
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
+| Resource | Details |
 |---|---|
-| `bootstrap.sh` or `deploy.sh` says Recall did not answer | Look at the logs (below). If the certificate could not be issued (ports 80/443 not open, or Let's Encrypt limits on sslip.io), switch to plain HTTP: `sudo RECALL_SITE=:80 ./deploy/aws/deploy.sh`, and use `http://3.91.20.7` as `recall.serverUrl`. |
-| SSH times out | The SSH rule allows only the IP you had when you created it (it changes with Wi-Fi). EC2 → Security Groups → `recall-sg` → **Edit inbound rules** → SSH → **My IP**. |
-| SSH: "permissions are too open" | Run the `chmod 400` (macOS) or `icacls` (Windows) command from Step 1.1. |
-| Build killed / out of memory | Make sure the instance is t3.medium or larger. Check swap with `swapon --show`. |
-| Health not UP after a new session | EC2 → Instances → `recall` → **Start**, wait 2 minutes. Then check the logs. |
-| URL changed after a new session | The Elastic IP is missing. Associate one (Step 1.3), then run `sudo ./deploy/aws/deploy.sh`. |
-| VS Code shows `Recall ○` | Is the lab running? Does the health URL open in a browser? Is `recall.serverUrl` exactly the URL, with no trailing path? |
-| Lost the invite code | VS Code shows it only when the team is created. Any member can read it from `GET /api/v1/team` (see [API.md](API.md)). |
+| `AppSecurityGroup` | 443 and 80 from anywhere; 22 from `SshCidr` (default anywhere; narrow it to `your.ip/32` if you can) |
+| `DbSecurityGroup` | 5432 only from `AppSecurityGroup` |
+| `Database` | RDS PostgreSQL, db.t3.micro, 20 GB gp2, single-AZ, not public, no backups (the sandbox is wiped anyway) |
+| `AppServer` | EC2 t3.small, Amazon Linux 2023, 20 GB gp3, `vockey`, `LabInstanceProfile` (for Session Manager) |
 
-**Useful commands on the server**
+At boot, the server runs [`deploy/aws/setup.sh`](../deploy/aws/setup.sh): installs Docker, adds 2 GB swap, pulls the
+backend image, starts [`docker-compose.yml`](../deploy/aws/docker-compose.yml) (backend, RabbitMQ, Caddy), loads the
+demo data, writes the landing page and waits for HTTPS. Secrets are never typed by anyone: the database password is the
+stack's own UUID, and the login-token secret is generated on the server.
 
-```bash
-cd ~/recall && sudo docker compose -f docker-compose.yml -f deploy/aws/docker-compose.prod.yml ps
-```
+**Parameters** (all have working defaults): `DatabaseMode` (`rds` or `container`), `LoadDemoData`, `InstanceType`
+(`t3.small` or `t2.small`), `KeyName` (`vockey`), `InstanceProfile` (`LabInstanceProfile`), `SshCidr`, `GitRepo`,
+`GitBranch`, `BackendImage`.
 
-```bash
-cd ~/recall && sudo docker compose -f docker-compose.yml -f deploy/aws/docker-compose.prod.yml logs -f --tail=100 backend caddy
-```
+**Cost** against the sandbox budget, roughly: t3.small about $0.02/hour, db.t3.micro about $0.02/hour, plus a little
+for storage and the public IP. A 4-hour session costs well under $0.50. Check the remaining budget at the top of the lab
+page; if it runs out, the sandbox is disabled.
 
-The generated passwords and login-token secret are in `~/recall/.env` (readable only by root). Do not delete it:
-re-running `deploy.sh` without it creates new passwords that no longer match the existing database.
-
----
-
-## What is in `deploy/aws`
-
-| File | What it does |
-|---|---|
-| [`docker-compose.prod.yml`](../deploy/aws/docker-compose.prod.yml) | Production overrides: no public ports for the database, queue or backend; real secrets required; adds Caddy |
-| [`Caddyfile`](../deploy/aws/Caddyfile) | HTTPS reverse proxy to the backend |
-| [`bootstrap.sh`](../deploy/aws/bootstrap.sh) | One-time server setup: Docker, swap, then `deploy.sh` |
-| [`deploy.sh`](../deploy/aws/deploy.sh) | Creates `.env` with random secrets, works out the URL, builds, starts and waits for health. `--pull` updates the code first. |
-
-## Not included on purpose
-
-- **The Ollama AI fallback.** It needs far more memory or a GPU. Without it, questions nobody has answered get `NONE`.
-- **Automatic deploys from GitHub Actions.** Learner Lab credentials expire every session, so they cannot be stored in
-  GitHub. Deploy with `deploy.sh --pull`.
+**Not included on purpose:** the Ollama AI fallback (needs far more memory than the sandbox allows) and automatic
+deploys from GitHub (sandbox credentials expire every session).

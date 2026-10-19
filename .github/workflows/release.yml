@@ -1,0 +1,69 @@
+name: Release
+
+# Every push to main publishes what the AWS deployment and teammates download:
+#   - the backend image  ghcr.io/<owner>/recall-backend:latest  (the EC2 instance pulls it instead of compiling)
+#   - recall.vsix on the rolling GitHub release "latest"         (teammates install it from the Releases page)
+# Runs after CI passes on main, so a broken commit is never published.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  backend-image:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/recall-backend:latest
+            ghcr.io/${{ github.repository_owner }}/recall-backend:${{ github.event.workflow_run.head_sha || github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+  extension-vsix:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+        working-directory: extension
+      - run: npm run package
+        working-directory: extension
+      - name: Publish to the "latest" release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          notes="Built from ${SHA}. Install in VS Code: Extensions → ⋯ → Install from VSIX… → recall.vsix"
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --notes "$notes"
+          else
+            gh release create latest --title "Recall (latest build)" --notes "$notes" --latest
+          fi
+          gh release upload latest extension/recall.vsix --clobber

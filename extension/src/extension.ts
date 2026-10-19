@@ -10,6 +10,7 @@ import { FixAdvisor, OfferedFix } from './fixes';
 import { PanelAction, RecallPanel, insertIntoTerminal } from './panel';
 import type { PanelState } from './panelHtml';
 import { SearchController } from './search';
+import { normalizeServerUrl } from './serverUrl';
 import { renderStatus } from './status';
 import { TerminalWatcher } from './watcher';
 
@@ -139,6 +140,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Recall
     vscode.commands.registerCommand('recall.menu', async () => {
       const items = menuItems({
         signedIn,
+        connected,
+        serverUrl: serverUrl(),
         capturing: config().get<boolean>('enabled', true),
         hasLastFix: !!fixes.lastFix(),
         queued: queue?.size() ?? 0,
@@ -146,6 +149,38 @@ export async function activate(context: vscode.ExtensionContext): Promise<Recall
       const picked = await vscode.window.showQuickPick(items, { title: 'Recall', placeHolder: 'What do you want to do?' });
       if (picked) {
         await vscode.commands.executeCommand(picked.command);
+      }
+    }),
+    vscode.commands.registerCommand('recall.setServerUrl', async (value?: string) => {
+      const input = value ?? (await vscode.window.showInputBox({
+        title: 'Recall server URL',
+        prompt: 'The address of your Recall server, for example https://3-91-20-7.sslip.io',
+        value: serverUrl(),
+        ignoreFocusOut: true,
+        validateInput: (v) => (normalizeServerUrl(v) ? undefined : 'Enter an http:// or https:// address'),
+      }));
+      if (input === undefined) {
+        return;
+      }
+      const url = normalizeServerUrl(input);
+      if (!url) {
+        void vscode.window.showErrorMessage(`Recall: "${input}" is not an http:// or https:// address.`);
+        return;
+      }
+      const changed = url !== serverUrl();
+      await config().update('serverUrl', url, vscode.ConfigurationTarget.Global);
+      // A login belongs to one server (each server signs its own tokens), so a new server needs a new sign-in.
+      if (changed && signedIn) {
+        await tokens.clear();
+      }
+      if (!(await refreshHealth())) {
+        void vscode.window.showWarningMessage(`Recall: saved, but ${url} is not reachable yet.`);
+      } else if (!signedIn) {
+        const signInNow = 'Sign in';
+        const picked = await vscode.window.showInformationMessage(`Recall: connected to ${url}.`, signInNow);
+        if (picked === signInNow) {
+          await vscode.commands.executeCommand('recall.signIn');
+        }
       }
     }),
     vscode.commands.registerCommand('recall.showLog', () => log.show()),

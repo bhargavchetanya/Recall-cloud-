@@ -1,5 +1,14 @@
-# RECALL_SITE comes from .env: e.g. 3-91-20-7.sslip.io (automatic HTTPS) or :80 (plain HTTP).
-{$RECALL_SITE} {
+# Two addresses for the same site:
+#   https://<ip-with-dashes>.sslip.io  real HTTPS (Let's Encrypt), what VS Code should use
+#   http://<public-ip>                  plain HTTP, works even if the certificate could not be issued
+# /api/* goes to the backend; everything else is the landing page setup.sh writes (URL, invite code, demo accounts).
+{$RECALL_SITE}, http://{$RECALL_IP} {
 	encode gzip
-	reverse_proxy backend:8080
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	handle {
+		root * /srv
+		file_server
+	}
 }
