@@ -13,7 +13,7 @@ class EventRateLimiterTest {
 
     private final ManualClock clock = new ManualClock();
     private final EventRateLimiter limiter = new EventRateLimiter(
-            new RecallProperties(null, null, null, null, null, null, null, new RecallProperties.RateLimit(100)), clock);
+            new RecallProperties(null, null, null, null, null, null, new RecallProperties.RateLimit(100)), clock);
     private final UUID ada = UUID.randomUUID();
 
     @Test

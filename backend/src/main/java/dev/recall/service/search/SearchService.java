@@ -6,8 +6,6 @@ import dev.recall.domain.Answer.Provenance;
 import dev.recall.repository.CommandSearchRepository;
 import dev.recall.repository.CommandSearchRepository.Neighbor;
 import dev.recall.repository.CommandSearchRepository.Usage;
-import dev.recall.service.ai.CommandSafety;
-import dev.recall.service.ai.FixSuggester;
 import dev.recall.service.embedding.EmbeddingService;
 import java.time.Clock;
 import java.time.Duration;
@@ -18,7 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
-/** Task search: one command from the team's history, else an AI suggestion, else nothing. */
+/** Task search: one command from the team's history, else nothing. */
 @Service
 public class SearchService {
 
@@ -27,22 +25,17 @@ public class SearchService {
     record Scored(Neighbor neighbor, Usage usage, double score) {}
 
     static final String NONE_EXPLANATION = "Nobody on your team has run anything like this yet.";
-    static final String AI_EXPLANATION = "Suggested by the local AI model, not by your team. Check it before running.";
 
     private final EmbeddingService embeddings;
     private final CommandSearchRepository repository;
-    private final FixSuggester suggester;
-    private final CommandSafety safety;
     private final RecallProperties.Ranking config;
     private final Ranking ranking;
     private final Clock clock;
 
-    public SearchService(EmbeddingService embeddings, CommandSearchRepository repository, FixSuggester suggester,
-                         CommandSafety safety, RecallProperties properties, Clock clock) {
+    public SearchService(EmbeddingService embeddings, CommandSearchRepository repository, RecallProperties properties,
+                         Clock clock) {
         this.embeddings = embeddings;
         this.repository = repository;
-        this.suggester = suggester;
-        this.safety = safety;
         this.config = properties.ranking();
         this.ranking = new Ranking(properties.ranking());
         this.clock = clock;
@@ -75,12 +68,7 @@ public class SearchService {
                             u.uses()),
                     null);
         }
-        return suggester.suggest(FixSuggester.SuggestionRequest.forTask(q.text(), q.shell(), q.os(), q.cwd(),
-                        q.repoName()))
-                .filter(s -> !safety.isDestructive(s.command()))
-                .map(s -> Answer.ai(s.command(), s.explanation() == null || s.explanation().isBlank()
-                        ? AI_EXPLANATION : s.explanation()))
-                .orElseGet(() -> Answer.none(NONE_EXPLANATION));
+        return Answer.none(NONE_EXPLANATION);
     }
 
     static double round(double score) {

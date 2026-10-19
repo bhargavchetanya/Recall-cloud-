@@ -1,11 +1,7 @@
-// End-to-end check of a running Recall: starts docker compose, waits for /health, then walks the whole story with
-// fresh accounts and asserts every response. Prints E2E PASS, or the first mismatch and exits 1.
-import { execSync } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+// End-to-end check of a running Recall (RECALL_SERVER, default http://localhost:8080): waits for /health, then walks
+// the whole story with fresh accounts and asserts every response. Prints E2E PASS, or the first mismatch and exits 1.
 import { SERVER, eventually, get, post, waitForHealth } from './api.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const run = Date.now().toString(36);
 let step = 0;
 
@@ -24,10 +20,6 @@ const EADDRINUSE = (port) =>
   `{ code: 'EADDRINUSE', errno: -98, syscall: 'listen', address: '::', port: ${port} }`;
 
 async function main() {
-  if (!process.env.RECALL_E2E_SKIP_COMPOSE) {
-    console.log('Starting docker compose (first run builds the backend image; this can take a few minutes)...');
-    execSync('docker compose up -d', { cwd: root, stdio: 'inherit' });
-  }
   console.log(`Waiting for ${SERVER}/api/v1/health ...`);
   const health = await waitForHealth();
   check('health: status, db, queue and embedder are UP',
@@ -78,8 +70,8 @@ async function main() {
     secret.body.source === 'TEAM' && secret.body.command === 'mysql -u root -p*** shop', secret.body);
 
   const miss = await post('/search', { query: 'purple elephants sing sonatas under the ocean' }, bo.body.token);
-  check('a question nobody has an answer for gets NONE (or an unverified AI answer)',
-    miss.status === 200 && (miss.body.source === 'NONE' || miss.body.source === 'AI') && !miss.body.provenance, miss.body);
+  check('a question nobody has an answer for gets NONE',
+    miss.status === 200 && miss.body.source === 'NONE' && !miss.body.provenance, miss.body);
 
   const feedback = await post(`/fixes/${fix.fixId}/feedback`, { worked: true }, bo.body.token);
   check('feedback on the fix is recorded (204)', feedback.status === 204, feedback.status);

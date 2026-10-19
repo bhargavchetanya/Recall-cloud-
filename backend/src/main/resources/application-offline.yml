@@ -1,4 +1,0 @@
-# Runs without the ONNX model file: deterministic hashing embeddings (weaker search quality).
-recall:
-  embedding:
-    provider: hashing

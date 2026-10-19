@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Picks the embedder from {@code recall.embedding.provider}: {@code onnx} by default, {@code hashing} under the
- * {@code test} and {@code offline} profiles (see application-*.yml). Either way it is wrapped in an LRU cache.
+ * {@code test} profile (see application-test.yml). Either way it is wrapped in an LRU cache.
  */
 @Configuration
 public class EmbeddingConfig {

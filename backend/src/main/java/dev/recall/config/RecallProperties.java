@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "recall")
-public record RecallProperties(Jwt jwt, Events events, Embedding embedding, Ranking ranking, Ai ai, Errors errors,
+public record RecallProperties(Jwt jwt, Events events, Embedding embedding, Ranking ranking, Errors errors,
                                Learning learning, RateLimit rateLimit) {
 
     /** HMAC secret (at least 32 bytes) and token lifetime. */
@@ -24,9 +24,6 @@ public record RecallProperties(Jwt jwt, Events events, Embedding embedding, Rank
     public record Ranking(double cosineWeight, double usageWeight, double recencyWeight, double contextWeight,
                           double usageSaturation, double recencyDays, double threshold, int annLimit,
                           int candidateLimit, int efSearch) {}
-
-    /** Which fix suggester to use ({@code noop} or {@code ollama}) and how to reach Ollama. */
-    public record Ai(String provider, String ollamaUrl, String model, Duration timeout) {}
 
     /** When a similar error's fix is good enough, and when bad feedback retires a fix. */
     public record Errors(double similarityThreshold, int demoteMinFailures) {}

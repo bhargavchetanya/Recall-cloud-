@@ -47,7 +47,7 @@ class LearningServiceTest {
         pending = mock(PendingErrorRepository.class);
         fixes = mock(FixRepository.class);
         learning = new LearningService(pending, fixes,
-                new RecallProperties(null, null, null, null, null, null, LEARNING, null));
+                new RecallProperties(null, null, null, null, null, LEARNING, null));
     }
 
     @Test

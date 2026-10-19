@@ -28,7 +28,7 @@ class TokenServiceTest {
             "unit-test-secret-that-is-at-least-32-bytes".getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     private final Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     private final RecallProperties properties = new RecallProperties(
-            new RecallProperties.Jwt("unused", Duration.ofDays(30)), null, null, null, null, null, null, null);
+            new RecallProperties.Jwt("unused", Duration.ofDays(30)), null, null, null, null, null, null);
     private final TokenService service = new TokenService(new NimbusJwtEncoder(new ImmutableSecret<>(key)), properties,
             Clock.fixed(now, ZoneOffset.UTC));
 

@@ -11,20 +11,18 @@ Base path `/api/v1`. JSON in and out. Every endpoint except `/auth/**` and `/hea
 Every error, including unknown routes (404), wrong methods (405), rate limiting (429) and unexpected server errors
 (500), uses this format.
 
-**AI answers.** When nothing in the team's history fits, `/search` and `/errors/resolve` can return
-`"source":"AI"`: one command from the local Ollama model (only when the backend runs with the `ai` profile and
-Ollama is reachable). These are unverified: `confidence`, `provenance` and `fixId` are null. Suggestions on a
-deny-list (wiping disks, deleting `/` or home, fork bombs, shutting down, force-pushing a protected branch) are never
-returned; you get `NONE` instead.
+Answers from `/search` and `/errors/resolve` have `"source":"TEAM"` (a command someone on the team ran, with
+provenance) or `"source":"NONE"` (nothing fits yet).
 
-The examples use Git Bash / Linux. `TOKEN` is the `token` from any auth response.
+In the examples, `R` is your server (the CloudFormation stack's `RecallUrl` output, for example
+`R=https://3-80-65-109.sslip.io`) and `TOKEN` is the `token` from any auth response.
 
 ## POST /auth/register
 
 Creates a team and its owner. **201**
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/auth/register -H 'content-type: application/json' \
+curl -s -X POST $R/api/v1/auth/register -H 'content-type: application/json' \
   -d '{"teamName":"Core","email":"ada@example.com","password":"correct-horse","displayName":"Ada"}'
 ```
 
@@ -42,7 +40,7 @@ curl -s -X POST http://localhost:8080/api/v1/auth/register -H 'content-type: app
 Joins the team that owns `inviteCode` as a member. The code is case-insensitive. **201**
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/auth/join -H 'content-type: application/json' \
+curl -s -X POST $R/api/v1/auth/join -H 'content-type: application/json' \
   -d '{"inviteCode":"K7QMZ3RXTP","email":"bob@example.com","password":"correct-horse","displayName":"Bob"}'
 ```
 
@@ -61,7 +59,7 @@ curl -s -X POST http://localhost:8080/api/v1/auth/join -H 'content-type: applica
 **200**
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/auth/login -H 'content-type: application/json' \
+curl -s -X POST $R/api/v1/auth/login -H 'content-type: application/json' \
   -d '{"email":"ada@example.com","password":"correct-horse"}'
 ```
 
@@ -78,7 +76,7 @@ The server masks secrets again before queueing. Team and user come from the toke
 Re-sending an event with the same `sessionId` + `seq` is harmless: it is stored once.
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/events -H "authorization: Bearer $TOKEN" \
+curl -s -X POST $R/api/v1/events -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"events":[{
     "sessionId":"3b0e…","seq":7,"commandText":"npm run dev","redacted":false,
     "cwd":"/home/ada/shop","repoName":"shop","shell":"bash","os":"linux",
@@ -112,11 +110,10 @@ curl -s -X POST http://localhost:8080/api/v1/events -H "authorization: Bearer $T
 ## POST /search
 
 Finds **one** command in the caller's team history for a task described in plain words. **200**
-The optional `cwd` and `repoName` add a bonus to commands used in the same place; `shell` and `os` are passed to
-the AI suggester when there is one.
+The optional `cwd` and `repoName` add a bonus to commands used in the same place.
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/search -H "authorization: Bearer $TOKEN" \
+curl -s -X POST $R/api/v1/search -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"query":"undo my last commit but keep the changes","repoName":"shop"}'
 ```
 
@@ -126,9 +123,8 @@ curl -s -X POST http://localhost:8080/api/v1/search -H "authorization: Bearer $T
  "explanation":"Closest match in your team's history (meaning 0.72, used 4×).","fixId":null}
 ```
 
-`source` is `TEAM` when a teammate's command scores at least `recall.ranking.threshold` (0.55), `AI` when the
-local model suggested something (unverified; `confidence` and `provenance` are null), otherwise `NONE` with
-`command: null`.
+`source` is `TEAM` when a teammate's command scores at least `recall.ranking.threshold` (0.55), otherwise `NONE`
+with `command: null`.
 
 Ranking, with every weight in `application.yml` under `recall.ranking`:
 
@@ -147,14 +143,13 @@ The team's fix for an error that just happened. **200**, same shape as `/search`
 The order is:
 1. an exact fingerprint match (best `worked − 2·failed`, then most recent);
 2. a similar error's fix (cosine ≥ `recall.errors.similarity-threshold`, 0.80);
-3. the AI suggester;
-4. `NONE`.
+3. `NONE`.
 
 Fixes with at least three "didn't work" reports and more failures than successes are never returned. The request is
 masked and not stored.
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/errors/resolve -H "authorization: Bearer $TOKEN" \
+curl -s -X POST $R/api/v1/errors/resolve -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{"commandText":"npm run dev","errorText":"Error: listen EADDRINUSE: address already in use :::8080","exitCode":1}'
 ```
@@ -170,7 +165,7 @@ curl -s -X POST http://localhost:8080/api/v1/errors/resolve -H "authorization: B
 | `commandText` | yes | the command that failed |
 | `errorText` | yes | its output (the extension sends the last 8 KB) |
 | `exitCode` | yes | |
-| `cwd`, `repoName`, `shell`, `os` | no | passed to the AI suggester |
+| `cwd`, `repoName`, `shell`, `os` | no | context; not needed to find a fix |
 | `osUser` | no | replaced by `<user>` when normalizing the error |
 
 ## POST /fixes/{id}/feedback
@@ -178,7 +173,7 @@ curl -s -X POST http://localhost:8080/api/v1/errors/resolve -H "authorization: B
 Records whether a fix worked. **204**. `worked:true` counts one more success; `worked:false` counts one more failure.
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8080/api/v1/fixes/$FIX_ID/feedback \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST $R/api/v1/fixes/$FIX_ID/feedback \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"worked":false}'
 ```
 
@@ -195,7 +190,7 @@ The caller's own team: its name, invite code (to bring in teammates) and members
 spec; added so the invite code can be shown again after registering (the demo seed uses it).
 
 ```bash
-curl -s http://localhost:8080/api/v1/team -H "authorization: Bearer $TOKEN"
+curl -s $R/api/v1/team -H "authorization: Bearer $TOKEN"
 ```
 
 ```json
@@ -208,7 +203,7 @@ curl -s http://localhost:8080/api/v1/team -H "authorization: Bearer $TOKEN"
 No authentication. Returns 200 when the database and queue are reachable, 503 otherwise.
 
 ```bash
-curl -s http://localhost:8080/api/v1/health
+curl -s $R/api/v1/health
 ```
 
 ```json

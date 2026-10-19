@@ -74,8 +74,7 @@ class OnnxEmbeddingServiceIT extends EmbeddingContract {
     void missingModelGivesAnActionableError(@org.junit.jupiter.api.io.TempDir Path empty) {
         assertThatThrownBy(() -> OnnxEmbeddingService.load(empty))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("scripts/fetch-model.sh")
-                .hasMessageContaining("offline");
+                .hasMessageContaining("scripts/fetch-model.sh");
     }
 
     @Test

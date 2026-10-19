@@ -1,4 +1,4 @@
-// Small helpers shared by seed-demo, e2e and load-test. Plain Node 18+ (global fetch), no dependencies.
+// Small helpers shared by seed-demo and e2e. Plain Node 18+ (global fetch), no dependencies.
 
 export const SERVER = (process.env.RECALL_SERVER ?? 'http://localhost:8080').replace(/\/+$/, '');
 const API = `${SERVER}/api/v1`;

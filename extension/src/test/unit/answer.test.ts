@@ -57,11 +57,6 @@ describe('fixNotificationText', () => {
       .toBe('Recall: a teammate fixed this — npx kill-port 3000');
   });
 
-  it('labels AI suggestions as unverified', () => {
-    expect(fixNotificationText({ ...base, command: 'chmod +x run.sh', source: 'AI', fixId: null }))
-      .toBe('Recall (unverified AI suggestion): chmod +x run.sh');
-  });
-
   it('has nothing to say for NONE', () => {
     expect(fixNotificationText({ ...base, command: null, source: 'NONE', fixId: null })).toBeNull();
   });

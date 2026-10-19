@@ -42,8 +42,7 @@ public final class OnnxEmbeddingService implements EmbeddingService, AutoCloseab
         Path vocab = modelDir.resolve(VOCAB_FILE);
         if (!Files.isRegularFile(model) || !Files.isRegularFile(vocab)) {
             throw new IllegalStateException("Embedding model not found in " + modelDir.toAbsolutePath()
-                    + ". Run scripts/fetch-model.sh (or scripts/fetch-model.ps1), or start with the 'offline' profile"
-                    + " to use hashing embeddings.");
+                    + ". Run scripts/fetch-model.sh to download it (the Docker image already contains it).");
         }
         try {
             OrtEnvironment env = OrtEnvironment.getEnvironment();

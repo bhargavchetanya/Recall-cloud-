@@ -63,12 +63,6 @@ recall:
     # Distinct commands scored after grouping.
     candidate-limit: 50
     ef-search: 200
-  ai:
-    # noop (default) or ollama; the ai profile switches to ollama. Unreachable Ollama behaves like noop.
-    provider: noop
-    ollama-url: ${RECALL_OLLAMA_URL:http://localhost:11434}
-    model: ${RECALL_OLLAMA_MODEL:qwen2.5-coder:7b}
-    timeout: 10s
   rate-limit:
     # A runaway loop must not flood the queue; the extension backs off on 429.
     events-per-minute: 100

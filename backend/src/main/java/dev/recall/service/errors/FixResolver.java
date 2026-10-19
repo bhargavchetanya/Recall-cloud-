@@ -6,8 +6,6 @@ import dev.recall.domain.Answer.Provenance;
 import dev.recall.repository.FixRepository;
 import dev.recall.repository.FixRepository.Fix;
 import dev.recall.service.SecretMasker;
-import dev.recall.service.ai.CommandSafety;
-import dev.recall.service.ai.FixSuggester;
 import dev.recall.service.embedding.EmbeddingService;
 import dev.recall.service.errors.ErrorFingerprinter.Fingerprint;
 import java.util.Optional;
@@ -16,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Error resolution (spec §5.4): the team's best fix for exactly this fingerprint; else the fix of the most similar
- * error if it is similar enough; else an AI suggestion; else nothing. Always with who solved it and how often.
+ * error if it is similar enough; else nothing. Always with who solved it and how often.
  */
 @Service
 public class FixResolver {
@@ -26,33 +24,25 @@ public class FixResolver {
 
     static final String NONE_EXPLANATION =
             "Nobody on your team has fixed this error yet. Recall will learn from whatever fixes it.";
-    static final String AI_EXPLANATION = "Suggested by the local AI model, not by your team. Check it before running.";
-    /** How much of the (masked) error output the AI model sees: the end, where tools print the summary. */
-    static final int AI_ERROR_CHARS = 2000;
 
     private final ErrorFingerprinter fingerprinter;
     private final SecretMasker masker;
     private final EmbeddingService embeddings;
     private final FixRepository fixes;
-    private final FixSuggester suggester;
-    private final CommandSafety safety;
     private final double similarityThreshold;
     private final int demoteMinFailures;
 
     public FixResolver(ErrorFingerprinter fingerprinter, SecretMasker masker, EmbeddingService embeddings,
-                       FixRepository fixes, FixSuggester suggester, CommandSafety safety, RecallProperties properties) {
+                       FixRepository fixes, RecallProperties properties) {
         this.fingerprinter = fingerprinter;
         this.masker = masker;
         this.embeddings = embeddings;
         this.fixes = fixes;
-        this.suggester = suggester;
-        this.safety = safety;
         this.similarityThreshold = properties.errors().similarityThreshold();
         this.demoteMinFailures = properties.errors().demoteMinFailures();
     }
 
     public Answer resolve(UUID teamId, ErrorQuery q) {
-        String command = masker.mask(q.commandText()).text();
         String error = masker.mask(q.errorText()).text();
         Fingerprint fp = fingerprinter.fingerprint(error, q.osUser());
 
@@ -70,14 +60,7 @@ public class FixResolver {
                     Math.round(f.cosine() * 100), times(f.workedCount())));
         }
 
-        // The model gets the masked output itself: the normalized form hides the names and numbers it needs.
-        String errorTail = error.length() <= AI_ERROR_CHARS ? error : error.substring(error.length() - AI_ERROR_CHARS);
-        return suggester.suggest(new FixSuggester.SuggestionRequest(null, errorTail, command, q.shell(), q.os(),
-                        q.cwd(), q.repoName()))
-                .filter(s -> !safety.isDestructive(s.command()))
-                .map(s -> Answer.ai(s.command(), s.explanation() == null || s.explanation().isBlank()
-                        ? AI_EXPLANATION : s.explanation()))
-                .orElseGet(() -> Answer.none(NONE_EXPLANATION));
+        return Answer.none(NONE_EXPLANATION);
     }
 
     private static Answer team(Fix f, double confidence, String explanation) {

@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * Turns messy error output into a stable key, so the same problem matches even when ports, paths, hashes or times
  * differ. Steps (spec §5.2): strip escape codes; keep the error-ish lines plus the last three, at most 20; lower-case
  * and replace volatile parts with placeholders; collapse whitespace; SHA-256 of the result is the fingerprint.
- * Replacement order is time, url, path, hash, str, num, user (see docs/DECISIONS.md for why it differs from the spec).
+ * Replacement order is time, url, path, hash, str, num, user.
  */
 @Component
 public class ErrorFingerprinter {

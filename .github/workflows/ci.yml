@@ -62,9 +62,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      # Runs the same compose file the AWS instance runs (deploy/aws), with PostgreSQL in a container instead of RDS.
       # The image build downloads the pinned embedding model; the scripts need only Node.
-      - run: docker compose up -d --build
+      - run: docker build -t recall-backend:ci backend
+      - name: Start the AWS stack locally
+        working-directory: deploy/aws
+        run: |
+          cat > .env <<EOF
+          RECALL_IMAGE=recall-backend:ci
+          DB_HOST=postgres
+          DB_PASSWORD=ci-password
+          RABBITMQ_PASSWORD=ci-password
+          RECALL_JWT_SECRET=ci-secret-that-is-at-least-32-bytes-long
+          RECALL_SITE=localhost
+          RECALL_IP=127.0.0.1
+          EOF
+          mkdir -p site && echo ok > site/index.html
+          docker compose --profile localdb up -d --wait
       - run: ./scripts/seed-demo.sh
       - run: ./scripts/e2e.sh
+      - run: curl -fsk https://localhost/api/v1/health
       - if: failure()
-        run: docker compose logs --no-color backend | tail -200
+        working-directory: deploy/aws
+        run: docker compose --profile localdb logs --no-color backend caddy | tail -200

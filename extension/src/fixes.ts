@@ -13,7 +13,7 @@ export interface OfferedFix {
 }
 
 /**
- * When a command fails, asks the backend whether the team (or the AI) has a fix and offers it:
+ * When a command fails, asks the backend whether the team has a fix and offers it:
  * a notification with Insert / Why? / Dismiss, mirrored in the Recall panel on "Why?".
  */
 export class FixAdvisor {

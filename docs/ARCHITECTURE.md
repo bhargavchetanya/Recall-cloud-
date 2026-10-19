@@ -1,8 +1,8 @@
 # Architecture
 
 Recall has two parts: a VS Code extension that watches terminals, and a backend that stores the team's history,
-answers questions and learns fixes. Everything runs locally in Docker; nothing needs an API key or the internet at
-runtime.
+answers questions and learns fixes. The backend runs on AWS (EC2 + Amazon RDS), built by one CloudFormation template
+(see [Deployment on AWS](#deployment-on-aws)); nothing needs an API key or an outside service at runtime.
 
 ```mermaid
 flowchart LR
@@ -10,13 +10,12 @@ flowchart LR
         vsc["VS Code extension<br/>terminal watcher · secret masking<br/>offline queue · search panel"]
     end
 
-    subgraph server["Recall backend (docker compose)"]
+    subgraph server["Recall backend (EC2, Docker)"]
         api["REST API + JWT<br/>Spring Boot · /api/v1"]
         mq[["RabbitMQ<br/>recall.events.ingest"]]
         worker["Ingest worker<br/>masking · fingerprinting<br/>learning loop"]
         emb["Embedding model<br/>all-MiniLM-L6-v2 (ONNX, in-process)"]
-        db[("PostgreSQL 16 + pgvector<br/>command_events · error_events<br/>fixes · pending_errors")]
-        ai["AI fallback (optional)<br/>local Ollama · deny-list"]
+        db[("Amazon RDS: PostgreSQL + pgvector<br/>command_events · error_events<br/>fixes · pending_errors")]
     end
 
     vsc -- "POST /events (batches of 50)" --> api
@@ -27,7 +26,6 @@ flowchart LR
     worker -- "commands, errors, fixes" --> db
     api -- "query embedding" --> emb
     api -- "HNSW vector search" --> db
-    api -. "nothing in the team's history" .-> ai
 ```
 
 ## The two paths
@@ -59,15 +57,10 @@ cosine), groups identical commands and scores them:
 score = 0.60·cosine + 0.15·min(1, ln(1+uses)/ln(11)) + 0.15·exp(-age_days/30) + 0.10·(same repo or cwd)
 ```
 
-The best command is returned if its score is at least 0.55; otherwise the AI fallback is asked; otherwise the answer
-is `NONE`. `POST /errors/resolve` fingerprints the error: the team's best fix for that exact fingerprint wins
-(most successes minus twice the failures); else the fix of an error at least 0.80 similar; else the AI; else `NONE`.
-Every team answer carries provenance: who, when, how many times.
-
-The **AI fallback** is a local Ollama model, used only with the `ai` profile. It gets the masked command and error
-output, answers with one command line, and every suggestion passes a deny-list (disk wipes, `rm -rf /`, fork bombs,
-shutdown, force-pushing protected branches) before anyone sees it. If Ollama is missing or slow, Recall answers as if
-there were no AI.
+The best command is returned if its score is at least 0.55; otherwise the answer is `NONE`. `POST /errors/resolve`
+fingerprints the error: the team's best fix for that exact fingerprint wins (most successes minus twice the failures);
+else the fix of an error at least 0.80 similar; else `NONE`. Every answer carries provenance: who, when, how many
+times. Recall never invents a command: everything it offers, someone on the team actually ran.
 
 ## Isolation and privacy
 
@@ -117,7 +110,6 @@ flowchart LR
 | Embeddings | `backend/.../service/embedding` | ONNX Runtime + WordPiece tokenizer; hashing embedder for tests/offline |
 | Search | `backend/.../service/search` | ranking formula, all weights in `recall.ranking.*` |
 | Errors and learning | `backend/.../service/errors`, `service/learning` | fingerprinting, resolution, learning loop, feedback |
-| AI | `backend/.../service/ai` | Ollama client, no-op default, deny-list |
 | Database | `backend/src/main/resources/db/migration` | Flyway V1–V5 |
 
 ## Data model

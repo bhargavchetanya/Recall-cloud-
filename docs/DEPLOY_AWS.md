@@ -205,5 +205,4 @@ stack's own UUID, and the login-token secret is generated on the server.
 for storage and the public IP. A 4-hour session costs well under $0.50. Check the remaining budget at the top of the lab
 page; if it runs out, the sandbox is disabled.
 
-**Not included on purpose:** the Ollama AI fallback (needs far more memory than the sandbox allows) and automatic
-deploys from GitHub (sandbox credentials expire every session).
+**Not included on purpose:** automatic deploys from GitHub (sandbox credentials expire every session).

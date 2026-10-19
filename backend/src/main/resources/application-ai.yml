@@ -1,5 +1,0 @@
-# Local AI fallback through Ollama (RECALL_OLLAMA_URL, RECALL_OLLAMA_MODEL). If Ollama is not running, Recall
-# answers exactly as without this profile.
-recall:
-  ai:
-    provider: ollama

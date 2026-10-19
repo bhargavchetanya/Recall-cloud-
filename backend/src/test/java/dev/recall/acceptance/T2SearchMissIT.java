@@ -8,13 +8,13 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** T2 — a question nothing in the team's history answers gives NONE, or AI when a suggester is available. */
+/** T2 — a question nothing in the team's history answers gives NONE. */
 class T2SearchMissIT extends IntegrationTestBase {
 
     static final String NONSENSE = "purple elephants sing sonatas under the ocean";
 
     @Test
-    void nonsenseQueryWithoutAiIsNone() {
+    void nonsenseQueryIsNone() {
         Member dev = registerTeam("Nora");
         seedAndWait(this, dev);
 

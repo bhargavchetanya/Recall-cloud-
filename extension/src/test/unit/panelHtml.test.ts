@@ -27,13 +27,6 @@ describe('renderPanelHtml', () => {
     expect(html).toContain('You asked: <strong>undo my last commit</strong>');
   });
 
-  it('labels AI answers as unverified and has no provenance line', () => {
-    const html = render({ ...team, source: 'AI', confidence: null, provenance: null, explanation: 'from the model' });
-    expect(html).toContain('Unverified AI suggestion');
-    expect(html).not.toContain('class="provenance"');
-    expect(html).toContain('from the model');
-  });
-
   it('shows a no-match card with search again for NONE', () => {
     const html = render({ command: null, source: 'NONE', confidence: null, provenance: null,
       explanation: 'Nobody on your team has run anything like this yet.', fixId: null });
@@ -81,12 +74,5 @@ describe('renderPanelHtml for a fix', () => {
     expect(html).toContain('<pre class="command">npx kill-port 3000</pre>');
     expect(html).toContain('>Didn&#39;t work</button>');
     expect(html).not.toContain('Not what I wanted');
-  });
-
-  it('has no feedback button for an AI suggestion, which is not a stored fix', () => {
-    const html = renderPanelHtml({ kind: 'fix', query: 'x', answer: { ...fix, source: 'AI', fixId: null } },
-      'N', 'vscode-resource:', now);
-    expect(html).not.toContain('data-action="reject"');
-    expect(html).toContain('data-action="insert"');
   });
 });

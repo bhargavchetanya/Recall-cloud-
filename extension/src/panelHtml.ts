@@ -19,7 +19,6 @@ export function escapeHtml(text: string): string {
 
 const BADGE: Record<Answer['source'], string> = {
   TEAM: 'From your team',
-  AI: 'Unverified AI suggestion',
   NONE: 'No match',
 };
 
@@ -44,7 +43,6 @@ export function renderPanelHtml(state: PanelState, nonce: string, cspSource: str
   .card { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 12px 14px; max-width: 760px; }
   .badge { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; margin-bottom: 8px;
            background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
-  .badge.AI { background: var(--vscode-inputValidation-warningBackground); color: var(--vscode-foreground); }
   pre.command { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
                 background: var(--vscode-textCodeBlock-background); padding: 10px 12px; border-radius: 4px;
                 white-space: pre-wrap; word-break: break-all; margin: 0 0 8px; }

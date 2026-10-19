@@ -1,7 +1,7 @@
 /** The one answer the backend gives to a search or to an error. {@code fixId} is set only for stored fixes. */
 export interface Answer {
   command: string | null;
-  source: 'TEAM' | 'AI' | 'NONE';
+  source: 'TEAM' | 'NONE';
   confidence: number | null;
   provenance: Provenance | null;
   explanation: string | null;
@@ -88,9 +88,7 @@ export function fixNotificationText(answer: Answer): string | null {
   if (!answer.command || answer.source === 'NONE') {
     return null;
   }
-  return answer.source === 'TEAM'
-    ? `Recall: a teammate fixed this — ${answer.command}`
-    : `Recall (unverified AI suggestion): ${answer.command}`;
+  return `Recall: a teammate fixed this — ${answer.command}`;
 }
 
 const ERRORISH = /error|fatal|exception|denied|refused|not found|cannot|failed/i;

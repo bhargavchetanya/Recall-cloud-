@@ -37,7 +37,7 @@ class EventStoreTest {
     private final LearningService learning = mock(LearningService.class);
     private final EventStore store = new EventStore(repo, embeddings, glossary, fingerprinter, learning,
             new RecallProperties(null, new RecallProperties.Events(500, MAX_ERROR, Duration.ofSeconds(5), ""), null,
-                    null, null, null, null, null));
+                    null, null, null, null));
     private final UUID team = UUID.randomUUID();
     private final UUID user = UUID.randomUUID();
 

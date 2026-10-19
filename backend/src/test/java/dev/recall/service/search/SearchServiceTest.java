@@ -6,8 +6,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dev.recall.config.RecallProperties;
@@ -15,7 +13,6 @@ import dev.recall.domain.Answer;
 import dev.recall.repository.CommandSearchRepository;
 import dev.recall.repository.CommandSearchRepository.Neighbor;
 import dev.recall.repository.CommandSearchRepository.Usage;
-import dev.recall.service.ai.FixSuggester;
 import dev.recall.service.embedding.EmbeddingService;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,11 +20,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 class SearchServiceTest {
 
@@ -36,18 +31,15 @@ class SearchServiceTest {
     private final UUID team = UUID.randomUUID();
     private EmbeddingService embeddings;
     private CommandSearchRepository repo;
-    private FixSuggester suggester;
     private SearchService service;
 
     @BeforeEach
     void setUp() {
         embeddings = mock(EmbeddingService.class);
         repo = mock(CommandSearchRepository.class);
-        suggester = mock(FixSuggester.class);
         when(embeddings.embed(any())).thenReturn(new float[EmbeddingService.DIMENSIONS]);
-        when(suggester.suggest(any())).thenReturn(Optional.empty());
-        service = new SearchService(embeddings, repo, suggester, new dev.recall.service.ai.CommandSafety(),
-                new RecallProperties(null, null, null, RankingTest.SPEC, null, null, null, null), Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new SearchService(embeddings, repo,
+                new RecallProperties(null, null, null, RankingTest.SPEC, null, null, null), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -66,7 +58,6 @@ class SearchServiceTest {
                 new Answer.Provenance("Daksh", NOW.minus(Duration.ofDays(6)), 4));
         assertThat(answer.explanation()).contains("0.80", "4×");
         assertThat(answer.fixId()).isNull();
-        verify(suggester, never()).suggest(any());
     }
 
     @Test
@@ -99,45 +90,13 @@ class SearchServiceTest {
     }
 
     @Test
-    void belowThresholdWithoutAiIsNone() {
+    void belowThresholdIsNone() {
         neighbors(new Neighbor("git status", 0.10));
         usage(new Usage("git status", 1, NOW.minus(Duration.ofDays(60)), "x", false));
 
         Answer answer = service.search(team, query("purple elephant sonata"));
 
         assertThat(answer).isEqualTo(Answer.none(SearchService.NONE_EXPLANATION));
-    }
-
-    @Test
-    void belowThresholdAsksTheSuggesterWithTheTaskAndContext() {
-        neighbors();
-        when(suggester.suggest(any())).thenReturn(Optional.of(new FixSuggester.Suggestion("du -sh *", "sizes")));
-
-        Answer answer = service.search(team, new SearchService.Query("folder sizes", "/w", "repo", "bash", "linux"));
-
-        assertThat(answer).isEqualTo(Answer.ai("du -sh *", "sizes"));
-        ArgumentCaptor<FixSuggester.SuggestionRequest> captor = ArgumentCaptor.forClass(FixSuggester.SuggestionRequest.class);
-        verify(suggester).suggest(captor.capture());
-        assertThat(captor.getValue()).isEqualTo(
-                new FixSuggester.SuggestionRequest("folder sizes", null, null, "bash", "linux", "/w", "repo"));
-    }
-
-    @Test
-    void aiSuggestionWithoutExplanationGetsTheUnverifiedLabel() {
-        neighbors();
-        when(suggester.suggest(any())).thenReturn(Optional.of(new FixSuggester.Suggestion("ls", " ")),
-                Optional.of(new FixSuggester.Suggestion("ls", null)));
-
-        assertThat(service.search(team, query("x")).explanation()).isEqualTo(SearchService.AI_EXPLANATION);
-        assertThat(service.search(team, query("x")).explanation()).isEqualTo(SearchService.AI_EXPLANATION);
-    }
-
-    @Test
-    void destructiveAiSuggestionIsNeverShown() {
-        neighbors();
-        when(suggester.suggest(any())).thenReturn(Optional.of(new FixSuggester.Suggestion("sudo rm -rf /", "clean up")));
-
-        assertThat(service.search(team, query("free some disk space")).source()).isEqualTo(Answer.Source.NONE);
     }
 
     @Test

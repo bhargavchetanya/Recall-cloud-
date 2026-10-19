@@ -3,8 +3,8 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { runTests } from '@vscode/test-electron';
 
-/** Prefixes of temporary folders this run creates: the VS Code profile and the live test's throwaway repos. */
-const TEMP_PREFIXES = ['recall-vscode-', 'recall-live-'];
+/** Prefix of the temporary VS Code profile folder this run creates. */
+const TEMP_PREFIXES = ['recall-vscode-'];
 
 async function main(): Promise<void> {
   const extensionDevelopmentPath = path.resolve(__dirname, '../../../');

@@ -14,14 +14,12 @@ import dev.recall.domain.Answer;
 import dev.recall.repository.FixRepository;
 import dev.recall.repository.FixRepository.Fix;
 import dev.recall.service.SecretMasker;
-import dev.recall.service.ai.FixSuggester;
 import dev.recall.service.embedding.EmbeddingService;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 class FixResolverTest {
 
@@ -31,20 +29,16 @@ class FixResolverTest {
     private final UUID team = UUID.randomUUID();
     private final ErrorFingerprinter fingerprinter = new ErrorFingerprinter();
     private FixRepository fixes;
-    private FixSuggester suggester;
     private EmbeddingService embeddings;
     private FixResolver resolver;
 
     @BeforeEach
     void setUp() {
         fixes = mock(FixRepository.class);
-        suggester = mock(FixSuggester.class);
         embeddings = mock(EmbeddingService.class);
         when(embeddings.embed(any())).thenReturn(new float[] {1f});
-        when(suggester.suggest(any())).thenReturn(Optional.empty());
-        resolver = new FixResolver(fingerprinter, new SecretMasker(), embeddings, fixes, suggester,
-                new dev.recall.service.ai.CommandSafety(),
-                new RecallProperties(null, null, null, null, null, new RecallProperties.Errors(0.80, 3), null, null));
+        resolver = new FixResolver(fingerprinter, new SecretMasker(), embeddings, fixes,
+                new RecallProperties(null, null, null, null, new RecallProperties.Errors(0.80, 3), null, null));
     }
 
     @Test
@@ -88,46 +82,14 @@ class FixResolverTest {
     }
 
     @Test
-    void noFixAsksTheSuggesterWithMaskedCommandAndNormalizedError() {
+    void noFixKnownIsNone() {
         when(fixes.bestExact(eq(team), any(), eq(3))).thenReturn(Optional.empty());
         when(fixes.nearest(eq(team), any(), eq(3))).thenReturn(Optional.empty());
-        when(suggester.suggest(any())).thenReturn(Optional.of(new FixSuggester.Suggestion("chmod +x run.sh", null)));
 
         Answer a = resolver.resolve(team, new FixResolver.ErrorQuery("PGPASSWORD=hunter2 ./run.sh",
                 "bash: ./run.sh: Permission denied", 126, "/w", "app", "bash", "linux", null));
 
-        assertThat(a).isEqualTo(Answer.ai("chmod +x run.sh", FixResolver.AI_EXPLANATION));
-        ArgumentCaptor<FixSuggester.SuggestionRequest> captor =
-                ArgumentCaptor.forClass(FixSuggester.SuggestionRequest.class);
-        verify(suggester).suggest(captor.capture());
-        assertThat(captor.getValue().commandText()).isEqualTo("PGPASSWORD=*** ./run.sh");
-        assertThat(captor.getValue().errorText()).as("the masked output itself, not the normalized form")
-                .isEqualTo("bash: ./run.sh: Permission denied");
-        assertThat(captor.getValue().task()).isNull();
-    }
-
-    @Test
-    void theModelSeesOnlyTheLastPartOfLongOutput() {
-        when(fixes.bestExact(eq(team), any(), eq(3))).thenReturn(Optional.empty());
-        when(fixes.nearest(eq(team), any(), eq(3))).thenReturn(Optional.empty());
-        String longOutput = "noise ".repeat(1000) + "Error: the real problem";
-
-        resolver.resolve(team, query(longOutput));
-
-        ArgumentCaptor<FixSuggester.SuggestionRequest> captor =
-                ArgumentCaptor.forClass(FixSuggester.SuggestionRequest.class);
-        verify(suggester).suggest(captor.capture());
-        assertThat(captor.getValue().errorText()).hasSize(FixResolver.AI_ERROR_CHARS).endsWith("Error: the real problem");
-    }
-
-    @Test
-    void destructiveAiFixIsNeverShown() {
-        when(fixes.bestExact(eq(team), any(), eq(3))).thenReturn(Optional.empty());
-        when(fixes.nearest(eq(team), any(), eq(3))).thenReturn(Optional.empty());
-        when(suggester.suggest(any())).thenReturn(Optional.of(new FixSuggester.Suggestion("git push --force", null)));
-
-        assertThat(resolver.resolve(team, query("! [rejected] main -> main (non-fast-forward)")).source())
-                .isEqualTo(Answer.Source.NONE);
+        assertThat(a).isEqualTo(Answer.none(FixResolver.NONE_EXPLANATION));
     }
 
     @Test

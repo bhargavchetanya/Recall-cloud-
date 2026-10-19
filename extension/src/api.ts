@@ -46,7 +46,7 @@ export class RecallClient {
     return this.postJson<Answer>('/search', body, true);
   }
 
-  /** The team's fix for an error that just happened (or an AI suggestion, or NONE). */
+  /** The team's fix for an error that just happened, or NONE. */
   resolveError(body: ResolveRequest): Promise<Answer> {
     return this.postJson<Answer>('/errors/resolve', body, true);
   }

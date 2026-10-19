@@ -28,7 +28,7 @@ public class ErrorController {
         this.feedback = feedback;
     }
 
-    /** The team's fix for an error that just happened, or an AI suggestion, or nothing. */
+    /** The team's fix for an error that just happened, or nothing. */
     @PostMapping("/errors/resolve")
     public Answer resolve(AuthUser user, @Valid @RequestBody ResolveRequest request) {
         return resolver.resolve(user.teamId(), request.toQuery());
