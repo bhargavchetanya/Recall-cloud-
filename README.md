@@ -13,6 +13,7 @@
   <img alt="RabbitMQ 3" src="https://img.shields.io/badge/RabbitMQ-3-FF6600?logo=rabbitmq&logoColor=white">
   <img alt="Runs in Docker" src="https://img.shields.io/badge/runs%20in-Docker-2496ED?logo=docker&logoColor=white">
   <img alt="No API keys" src="https://img.shields.io/badge/API%20keys-none%20needed-success">
+  <img alt="Deploys to AWS" src="https://img.shields.io/badge/deploys%20to-AWS-FF9900?logo=amazonwebservices&logoColor=white">
 </p>
 
 <p align="center">
@@ -33,7 +34,7 @@
 | 🔎 **Search by meaning** | Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd>, type *"undo my last commit but keep the changes"*, and get **one** command from your team's history (`git reset --soft HEAD~1`), with who used it and when. |
 | 🩹 **Fixes for errors your team already solved** | When a command fails in your terminal, Recall checks whether a teammate hit the same error and offers their fix in a notification. |
 | 🧠 **Learns on its own** | Nobody writes anything down. When a command fails and the next one that works fixes it, that command becomes the team's fix for that error. |
-| 🔒 **Private and local** | Everything runs in Docker on your computer or a team server. No cloud, no API keys, no internet at runtime. Passwords and tokens are masked before anything leaves VS Code. |
+| 🔒 **Private, wherever it runs** | Runs in Docker on your computer, on a team server, or on AWS from one CloudFormation template. No API keys and no outside services at runtime. Passwords and tokens are masked before anything leaves VS Code. |
 | 🤖 **Optional local AI** | With [Ollama](https://ollama.com) installed, questions nobody on the team has answered get a clearly labelled, unverified AI suggestion. Dangerous suggestions (`rm -rf /`, …) are always blocked. |
 
 <details>
@@ -62,11 +63,12 @@ More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 3. [Step-by-step installation](#-step-by-step-installation)
 4. [Using Recall](#-using-recall)
 5. [Sharing Recall with your team](#-sharing-recall-with-your-team)
-6. [Optional: local AI with Ollama](#-optional-local-ai-with-ollama)
-7. [Stop, restart, update, reset](#-stop-restart-update-reset)
-8. [Troubleshooting](#-troubleshooting)
-9. [For developers](#-for-developers)
-10. [Privacy and security](#-privacy-and-security)
+6. [Deploy on AWS](#-deploy-on-aws)
+7. [Optional: local AI with Ollama](#-optional-local-ai-with-ollama)
+8. [Stop, restart, update, reset](#-stop-restart-update-reset)
+9. [Troubleshooting](#-troubleshooting)
+10. [For developers](#-for-developers)
+11. [Privacy and security](#-privacy-and-security)
 
 ---
 
@@ -281,6 +283,7 @@ You should see `Extension 'recall.vsix' was successfully installed.` Then **relo
 
 - **From the VS Code window:** open the Extensions view (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), click the **⋯** menu at the top → **Install from VSIX…** → pick `extension/recall.vsix`.
 - **From source, for development:** open the `recall` folder in VS Code and press <kbd>F5</kbd> (*Run Recall extension*). A second VS Code window opens with the extension loaded.
+- **From GitHub Releases:** download `recall.vsix` from the repository's [latest release](https://github.com/bhargavchetanya/Recall-cloud-/releases/latest), rebuilt after every green CI run on `main`.
 - **From CI:** download the `recall-vsix` artifact of a pipeline run.
 
 </details>
@@ -361,6 +364,7 @@ Open the Command Palette (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>) and typ
 | **Recall: Show last fix** | | Shows the last fix Recall offered, with who fixed it |
 | **Recall: Toggle capture** | | Pause or resume sharing your terminal commands |
 | **Recall: Sign in** / **Sign out** | | Log in, join or create a team / log out |
+| **Recall: Set server URL** | | Point VS Code at another Recall server (paste its address); asks you to sign in there |
 | **Recall: Show menu** | click the status bar | All of the above in one menu |
 | **Recall: Send queued events now** | | Sends commands that were queued while offline |
 | **Recall: Show log** | | What Recall is doing, for troubleshooting |
@@ -401,7 +405,7 @@ Answers are labelled **From your team** (someone on your team ran it), **Unverif
 
 Recall is most useful when the whole team uses **one** backend.
 
-> **On AWS?** [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md) builds everything (EC2, RDS, HTTPS, demo data) from one CloudFormation template, inside an AWS Academy sandbox.
+> **On AWS?** See [Deploy on AWS](#-deploy-on-aws) below.
 
 1. **Pick one computer or server** that stays on and that everyone can reach on the network. Start Recall there (steps 1–4).
 2. **Set a real secret** in `.env` on that machine, then restart with `docker compose up -d`:
@@ -410,12 +414,27 @@ Recall is most useful when the whole team uses **one** backend.
    ```
 3. **Find its address**, e.g. `192.168.1.20`: `ipconfig` on Windows, `ip addr` on Linux, `ipconfig getifaddr en0` on macOS. Allow port **8080** through its firewall (Windows asks the first time).
 4. **One person creates the team** (*Recall: Sign in → Create a team*) and shares the **invite code**.
-5. **Everyone else** installs the extension (step 6), sets **`recall.serverUrl`** to `http://192.168.1.20:8080`, and runs *Recall: Sign in → Join a team*.
+5. **Everyone else** installs the extension (step 6), runs **Recall: Set server URL** with `http://192.168.1.20:8080`, and runs *Recall: Sign in → Join a team*.
 
 Anyone who joins immediately benefits from the team's history. For example, a teammate who hits an error someone else already fixed gets the fix in their very first session.
 
 > [!WARNING]
 > The backend speaks plain HTTP. Use it on a trusted network (office LAN, VPN). For anything wider, put it behind a reverse proxy with HTTPS.
+
+---
+
+## 🚀 Deploy on AWS
+
+One CloudFormation template, [`deploy/aws/recall.yaml`](deploy/aws/recall.yaml), builds the whole backend in about 9 minutes: an EC2 instance (Amazon Linux 2023, Docker) running the backend, RabbitMQ and Caddy for HTTPS, and Amazon RDS for PostgreSQL with pgvector. It is sized for the AWS Academy sandbox (t3.small, us-east-1, `vockey`, `LabInstanceProfile`).
+
+1. AWS Console → **CloudFormation** → **Create stack** → upload `deploy/aws/recall.yaml` → stack name `recall` → keep the defaults → **Submit**.
+2. Wait for **CREATE_COMPLETE**. The stack completes only once Recall answers its health check.
+3. **Outputs** → open **RecallUrl** (for example `https://3-80-65-109.sslip.io`): the page shows the demo invite code and accounts.
+4. In VS Code: **Recall: Set server URL** → paste the RecallUrl → **Recall: Sign in**.
+
+Only HTTPS (and SSH) is open to the internet; the database accepts connections only from the app server. The server pulls the backend image that the Release workflow publishes to `ghcr.io/bhargavchetanya/recall-backend`.
+
+The full guide, with an instructor demo script, troubleshooting and costs, is in [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md). In an AWS Academy sandbox everything is deleted when the session ends; create the stack again next time.
 
 ---
 
@@ -555,9 +574,11 @@ recall/
 ├── extension/            VS Code extension (TypeScript, esbuild)
 ├── scripts/              seed-demo, e2e, load-test, fetch-model (.sh + .ps1; logic in scripts/lib/*.mjs)
 ├── shared/fixtures/      secret-masking cases used by both the backend and the extension tests
-├── docs/                 ARCHITECTURE.md · API.md · DEMO.md · DECISIONS.md
+├── deploy/aws/           CloudFormation template, EC2 setup script, compose file and Caddyfile for AWS
+├── docs/                 ARCHITECTURE.md · API.md · DEMO.md · DECISIONS.md · DEPLOY_AWS.md
 ├── docker-compose.yml    PostgreSQL + pgvector, RabbitMQ, backend
 └── .github/workflows/    CI: backend verify, extension tests + .vsix, end-to-end
+                          Release: backend image to GHCR + recall.vsix to GitHub Releases, after CI passes on main
 ```
 </details>
 
@@ -608,6 +629,7 @@ All scripts accept `RECALL_SERVER=http://host:port` to target another backend.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): components, data flow, data model
 - [docs/API.md](docs/API.md): every HTTP endpoint with `curl` examples
 - [docs/DEMO.md](docs/DEMO.md): a 5-minute lab demo script
+- [docs/DEPLOY_AWS.md](docs/DEPLOY_AWS.md): deploying on AWS with CloudFormation, and the instructor demo
 - [docs/DECISIONS.md](docs/DECISIONS.md): every design decision and deviation from the spec
 - [PROGRESS.md](PROGRESS.md): what was built, how it was tested, and what surprised us
 </details>

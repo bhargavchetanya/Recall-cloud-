@@ -13,8 +13,9 @@ Your team's terminal history as shared, searchable knowledge.
 
 ## Getting started
 
-1. Ask the person who runs your team's Recall backend for its URL and set `recall.serverUrl`
-   (default `http://localhost:8080`).
+1. Ask the person who runs your team's Recall backend for its URL, then run **Recall: Set server URL** and paste it
+   (this sets `recall.serverUrl`; default `http://localhost:8080`). The latest `recall.vsix` is on the repository's
+   [Releases page](https://github.com/bhargavchetanya/Recall-cloud-/releases/latest).
 2. Run **Recall: Sign in** and pick *Join a team* with your team's invite code (or *Create a team*).
 3. Use your terminals as usual. The status bar shows `Recall ●` when connected; click it for all Recall actions.
 

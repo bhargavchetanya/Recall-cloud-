@@ -275,3 +275,31 @@ The fresh stack, its volume, its image and the clone were removed afterwards.
   from another test in the same VS Code window. The walkthrough now runs alone and waits for a newly offered fix.
 - In the seed data, a look-around command in one fix story (`docker ps` after a failed `docker compose up`) would have
   been learned as the fix, because it uses the same tool. The learning rules are right; the story was rewritten.
+
+## Phase 6 — AWS deployment ✅
+
+**Done**
+- GitHub remote `bhargavchetanya/Recall-cloud-`; CI runs on every push. The first run failed with exit code 126:
+  `fetch-model.sh`, `e2e.sh`, `load-test.sh` and `mvnw` were committed without the executable bit. Fixed; CI green
+  (backend verify, extension tests, e2e). This closes the "CI has never run" item above.
+- Release workflow (`.github/workflows/release.yml`): after CI passes on `main`, publishes
+  `ghcr.io/bhargavchetanya/recall-backend:latest` (linux/amd64) and `recall.vsix` to the rolling GitHub release `latest`.
+- `deploy/aws/recall.yaml`: CloudFormation for the AWS Academy Cloud Developing sandbox (t3.small, Amazon-owned AMI,
+  RDS PostgreSQL allowed, everything deleted at session end): security groups, RDS, EC2 with a creation policy.
+  `deploy/aws/setup.sh` configures the instance; `deploy/aws/docker-compose.yml` + `Caddyfile` run backend, RabbitMQ
+  and Caddy (HTTPS via sslip.io, plain-HTTP fallback on the IP, landing page with the invite code).
+- Extension: **Recall: Set server URL** (also in the status-bar menu): normalises pasted addresses
+  (`serverUrl.ts`, 16 unit tests), signs out when the server changes, offers sign-in.
+- `docs/DEPLOY_AWS.md`: step-by-step guide, instructor demo script, troubleshooting, costs.
+
+**Tested**
+- `cfn-lint` clean on the template; compose config checked in both database modes.
+- Local run of the AWS compose stack: health UP, demo seed, landing page, and `scripts/e2e.sh` through Caddy: E2E PASS.
+- Live on AWS, 2026-10-19: stack CREATE_COMPLETE in about 9 minutes (RDS about 6, instance setup about 3); health UP
+  for db, queue and embedder over HTTPS; from VS Code, search returned `git reset --soft HEAD~1` and a failed
+  `git switch recall-demo` was answered with the team's fix (98% match).
+
+**Left**
+- The sandbox deletes everything at the end of each session, so the server address and invite code change every time.
+- Not covered in the sandbox: load balancer, auto scaling, backups, CloudWatch alarms (see DEPLOY_AWS.md).
+

@@ -77,6 +77,35 @@ there were no AI.
   Commands that start with a space, or match `recall.ignorePatterns`, never leave the machine.
 - The JWT lives in VS Code's SecretStorage (the OS keychain), never in settings.
 
+## Deployment on AWS
+
+The same backend runs on AWS from one CloudFormation template, [`deploy/aws/recall.yaml`](../deploy/aws/recall.yaml),
+built for the AWS Academy sandbox (t3.small, us-east-1, everything deleted when a session ends). Step-by-step guide:
+[DEPLOY_AWS.md](DEPLOY_AWS.md).
+
+```mermaid
+flowchart LR
+    gh["GitHub Actions<br/>CI, then Release:<br/>image to GHCR · recall.vsix"] -- "image pull" --> ec2
+    vsc["VS Code extension"] -- "HTTPS :443" --> caddy
+    subgraph stack["CloudFormation stack"]
+        subgraph ec2["EC2 t3.small · Amazon Linux 2023 · Docker"]
+            caddy["Caddy<br/>Let's Encrypt via sslip.io"] --> api["Recall backend"]
+            api --> mq[["RabbitMQ"]]
+        end
+        api -- "5432, app security group only" --> rds[("Amazon RDS<br/>PostgreSQL + pgvector")]
+    end
+```
+
+- **Resources:** an app security group (443, 80, 22 in), a DB security group (5432 only from the app group), an RDS
+  instance (db.t3.micro, not public, no backups) and the EC2 instance. `DatabaseMode=container` runs PostgreSQL on the
+  instance instead of RDS.
+- **Boot:** user data writes `/etc/recall.env`, clones the repository and runs `deploy/aws/setup.sh`: Docker, 2 GB swap,
+  pull the prebuilt image (or build from source if the pull fails), start `deploy/aws/docker-compose.yml`, seed the demo
+  team, write the landing page, wait for HTTPS. `cfn-signal` reports the result, so the stack is CREATE_COMPLETE only
+  once `/health` is UP.
+- **Secrets:** the database password is the stack's own UUID (the database is reachable only from the app instance); the
+  JWT secret is generated on the instance with `openssl rand`.
+
 ## Components
 
 | Part | Where | Notes |
